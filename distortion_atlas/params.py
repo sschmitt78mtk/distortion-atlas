@@ -136,6 +136,7 @@ CONTROLS: tuple[Control, ...] = (
     Control("grade", tuple(str(digit) for digit in range(10)), label="grade 0–9"),
     Control("overlay", ("h",), label="HUD"),
     Control("fixation", ("x",), label="fixation mark"),
+    Control("blindspot", ("b",), label="scotoma test"),
     Control("export", ("s",), label="export PNG + JSON"),
     Control("fullscreen", ("f",), label="fullscreen"),
     Control("reset", ("r",), label="reset parameters"),

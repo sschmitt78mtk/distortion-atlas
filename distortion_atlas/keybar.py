@@ -56,7 +56,7 @@ ROW_ACTIONS: tuple[tuple[str, ...], ...] = (
         "distance_up",
     ),
     ("grade", "eye", "correction"),
-    ("overlay", "fixation", "export", "fullscreen", "reset", "quit"),
+    ("overlay", "fixation", "blindspot", "export", "fullscreen", "reset", "quit"),
 )
 
 #: Short captions keyed by :attr:`distortion_atlas.params.Control.action`.
@@ -83,6 +83,7 @@ CAPTIONS: dict[str, str] = {
     "correction": "correction",
     "overlay": "HUD",
     "fixation": "fixation",
+    "blindspot": "scotoma test",
     "export": "export",
     "fullscreen": "fullscreen",
     "reset": "reset",

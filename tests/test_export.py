@@ -10,6 +10,7 @@ import numpy as np
 from PIL import Image
 
 from distortion_atlas import export
+from distortion_atlas.blindspot import BlindSpotSettings
 from distortion_atlas.ui import Session
 
 SIDE = 200
@@ -197,6 +198,50 @@ class PanelIdentityTest(SessionFixture):
         record = json.loads(result.json_path.read_text(encoding="utf-8"))
         self.assertEqual(record["panel"]["name"], "Bench Panel")
         self.assertEqual(record["panel"]["resolution"], "2560x1440")
+
+
+class BlindspotRecordTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = Path(self._tmp.name)
+
+    def test_a_finished_scotoma_test_adds_the_block_and_the_results_png(self):
+        session = Session(width=200, height=200, export_dir=self.dir)
+        session.params.eye = "left"
+        session.params.dot_pitch = 20
+        test = session.start_scotoma_test(
+            BlindSpotSettings(gap=(1000, 1000), seed=5, outside_sample=0),
+            now_ms=0,
+        )
+        self.assertTrue(test.tick(1000))
+        self.assertTrue(test.respond(1300))
+        test.stop(2000)
+        session.render()
+
+        result = session.export(timestamp=datetime(2026, 1, 2, 3, 4, 5))
+        self.assertTrue(result.ok, result.message())
+        record = json.loads(result.json_path.read_text(encoding="utf-8"))
+        block = record["blindspot"]
+        self.assertEqual(block["seed"], 5)
+        self.assertEqual(block["settings"]["window_ms"], 1500)
+        self.assertEqual(block["context"]["eye"], "left")
+        self.assertEqual(block["summary"]["seen"], 1)
+        self.assertEqual(block["summary"]["central_seen"], "1/24")
+        self.assertEqual(len(block["positions"]), len(test.positions))
+        attempts = [
+            attempt
+            for position in block["positions"]
+            for attempt in position["attempts"]
+        ]
+        self.assertEqual(attempts[0]["outcome"], "seen")
+        self.assertEqual(attempts[0]["response_ms"], 300)
+        self.assertIn("flashing", record["photosensitivity_warning"])
+        self.assertIn("Not a medical device", record["non_diagnostic"])
+
+        with Image.open(result.png_path) as image:
+            exported = np.asarray(image)
+        self.assertTrue(np.array_equal(exported, session.buffer))
 
 
 if __name__ == "__main__":

@@ -41,6 +41,9 @@ REPEAT_INTERVAL_MS = 80
 #: Default idle time after which the bar hides, in milliseconds (D4).
 KEY_BAR_IDLE_MS = 3000
 
+#: Scotoma-test clock sampling interval, in milliseconds (design D1).
+STIMULUS_SAMPLE_MS = 20
+
 
 #: GNOME schema whose keys Qt 6.6 still reads from the pre-45 location.
 XSETTINGS_SCHEMA = "org.gnome.settings-daemon.plugins.xsettings"
@@ -168,6 +171,7 @@ def _special_keys() -> dict:
         Qt.Key.Key_Tab: "Tab",
         Qt.Key.Key_Backtab: "Shift+Tab",
         Qt.Key.Key_Escape: "Esc",
+        Qt.Key.Key_Space: "Space",
         Qt.Key.Key_Plus: "+",
         Qt.Key.Key_Minus: "-",
         Qt.Key.Key_BracketLeft: "[",
@@ -244,6 +248,11 @@ class _ViewerWindow:
                 self._repeat_timer = QTimer(self)
                 self._repeat_timer.setInterval(REPEAT_INTERVAL_MS)
                 self._repeat_timer.timeout.connect(self._repeat_step)
+
+                # Scotoma test: sample the clock, repaint on a state change only.
+                self._stimulus_timer = QTimer(self)
+                self._stimulus_timer.setInterval(STIMULUS_SAMPLE_MS)
+                self._stimulus_timer.timeout.connect(self._sample_stimulus)
 
             # -- buffer and painting ---------------------------------------
             def set_buffer(self, buffer: np.ndarray) -> None:
@@ -376,9 +385,26 @@ class _ViewerWindow:
                     outer.session.hide_key_bar()
                     self._hover_key = None
                     self._stop_repeat()
+                test = outer.session.scotoma
+                if test is not None and not test.finished:
+                    if not self._stimulus_timer.isActive():
+                        self._stimulus_timer.start()
+                elif self._stimulus_timer.isActive():
+                    self._stimulus_timer.stop()
                 self.set_buffer(outer.session.presented())
                 self._apply_cursor()
                 return result
+
+            def _sample_stimulus(self) -> None:
+                """Advance the scotoma test clock and repaint on a change."""
+                test = outer.session.scotoma
+                if test is None or test.finished:
+                    self._stimulus_timer.stop()
+                    return
+                if outer.session.tick_scotoma_test():
+                    self.set_buffer(outer.session.presented())
+                if test.finished:
+                    self._stimulus_timer.stop()
 
             def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt naming)
                 if self.hold_until_key:
@@ -407,6 +433,12 @@ class _ViewerWindow:
                 if self.hold_until_key:
                     self.close()
                     QApplication.quit()
+                    return
+                test = outer.session.scotoma
+                if test is not None and not test.finished:
+                    # A click is a response only while a dot is lit; the bar is inert.
+                    if test.lit:
+                        self._dispatch("Space")
                     return
                 self._reveal()
                 button = self._button_at(event.position())
@@ -445,6 +477,7 @@ class _ViewerWindow:
 
             def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
                 self._stop_repeat()
+                self._stimulus_timer.stop()
                 QApplication.quit()
                 super().closeEvent(event)
 
@@ -506,6 +539,12 @@ class QtPresenter:
     def dispatch(self, key: str, coarse: bool = False):
         """Key dispatch without a real event, used by the offscreen test."""
         result = self.session.handle_key(key, coarse)
+        test = self.session.scotoma
+        if test is not None and not test.finished:
+            if not self.widget._stimulus_timer.isActive():
+                self.widget._stimulus_timer.start()
+        elif self.widget._stimulus_timer.isActive():
+            self.widget._stimulus_timer.stop()
         self.widget.set_buffer(self.session.presented())
         return result
 

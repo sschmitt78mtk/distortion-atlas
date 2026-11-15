@@ -9,8 +9,8 @@ pointer, all with exact visual-angle readouts and a per-item 0–9 grade that
 exports as PNG + JSON.
 
 **distortion-atlas supports observation of visual distortion. It is not a medical
-device and its output is not a diagnosis.** All current patterns are static; any
-future flashing content would carry a photosensitivity risk.
+device and its output is not a diagnosis.** The scotoma test presents flashing
+dots and therefore carries a photosensitivity risk; the static patterns do not.
 
 **AI-generated note:** everything in this repository is AI-generated — the code
 and tests as well as the OpenSpec artifacts under `openspec/` (proposals,
@@ -106,6 +106,7 @@ and applies it itself, so no environment variable is required (see
 | `0`–`9` | grade the item on screen |
 | `h` | readout overlay on/off |
 | `x` | fixation mark on/off |
+| `b` | start a scotoma (blind-spot) test on the dot lattice |
 | `s` | export PNG + JSON |
 | `f` | fullscreen / windowed |
 | `r` | reset the active family's parameters (keeps distance, eye, correction, ambient) |
@@ -123,7 +124,52 @@ reveals it, so observation stays chrome-free. A click dispatches the same key
 string as the keyboard, `Shift`+click applies the coarse step and holding a step
 button repeats it at the keyboard's auto-repeat cadence. The bar is never drawn
 for the pixel-path self-check (`c`), so that frame can still be judged by eye
-without chrome. No touch input is required or handled.
+without chrome. The bar is also hidden for the whole scotoma test run. No touch
+input is required or handled.
+
+## Scotoma test
+
+Press `b` while any pattern is displayed to replace it with a dot-by-dot
+detection session on a rectangular lattice aligned to the current lines pattern.
+The session eye, correction, viewing distance and pixel-path result are carried
+into the test unchanged, and the fixation mark is forced on.
+
+- **Trial plan.** All 24 positions of the inner 5x5 ring around fixation are
+  tested (the exact centre is skipped because the fixation mark sits there),
+  plus a seeded random sample of up to 75 dots outside that ring. The sample
+  seed and lattice geometry are written into the record so a run can be rebuilt.
+- **Timing.** One dot is lit at full contrast for a 1500 ms window; every other
+  dot stays at a faint contrast on black. After a random 500-3000 ms gap the
+  next dot appears. The lattice itself does not flash between trials, but the
+  random single-dot sequence still carries a photosensitivity risk; the results
+  frame repeats that warning.
+- **Response.** `Space` (or a left click) inside the window marks the position
+  seen, ends the presentation immediately and records the latency. A press with
+  no dot lit is counted as a late or anticipatory response and is not attributed
+  to any position. No response in the window is a miss.
+- **Adaptive probing.** A miss is retried once, at least five trials later. A
+  second miss marks the position blind and queues its eight neighbours, so a
+  confirmed blind region is mapped outward until the surround is seen.
+- **Controls.** `Space` responds, `p` pauses/resumes (an open dot is discarded and
+  retried, never counted as a miss), `q` ends the run and shows the results, `f`
+  toggles fullscreen, and `Esc` quits without writing a record. Every other key
+  is ignored while the run is active, so pattern parameters cannot change.
+- **Results.** Seen positions are green rings, blind positions red rings with a
+  filled centre, untested (queued but never reached) positions grey rings. The
+  caption reports the seen/blind/untested counts, the inner-ring attention check
+  (`n/24 seen`), the median response latency, each blind cluster's dot count,
+  centre and extent in degrees, and the non-diagnostic statement. A run with two
+  or fewer inner-ring dots seen is marked **not interpretable** instead of being
+  read as a scotoma map.
+- **Export.** Press `s` on the results frame to write the results PNG plus a JSON
+  record with a `blindspot` block (settings, seed, lattice, context, every
+  position with its attempts, summary counts and clusters). Export is refused
+  while the run is active. `b` restarts with a new seed.
+
+**Safety.** Test one eye at a time and cover the other: with both eyes open the
+fellow eye fills in a scotoma. The mode is an observation aid, not perimetry and
+not a diagnosis, and it should not replace an examination. Stop immediately if
+the flashing dots cause discomfort.
 
 ## What gets exported
 

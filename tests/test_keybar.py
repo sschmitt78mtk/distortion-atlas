@@ -14,7 +14,7 @@ STATE = {
     "grade": None,
 }
 
-ROW_COUNTS = (7, 10, 12, 6)
+ROW_COUNTS = (7, 10, 12, 7)
 
 
 def rows(bar):
@@ -34,7 +34,7 @@ class ButtonSetTest(unittest.TestCase):
         expected = set(CONTROL_BY_KEY) - {"Esc"}  # Esc shares the quit button
         self.assertEqual(set(keys), expected)
         self.assertEqual(len(keys), len(set(keys)), "a key owns two buttons")
-        self.assertEqual(len(self.bar.buttons), 35)
+        self.assertEqual(len(self.bar.buttons), 36)
 
     def test_the_digits_each_own_one_button(self):
         for digit in "0123456789":
@@ -45,6 +45,13 @@ class ButtonSetTest(unittest.TestCase):
             ]
             self.assertEqual(len(owned), 1, digit)
             self.assertEqual(owned[0].caption, digit)
+
+    def test_the_scotoma_test_control_owns_b(self):
+        buttons = [button for button in self.bar.buttons if button.action == "blindspot"]
+        self.assertEqual(len(buttons), 1)
+        self.assertEqual(buttons[0].key, "b")
+        self.assertEqual(buttons[0].caption, "scotoma test")
+        self.assertEqual(buttons[0].hint, "b")
 
     def test_the_quit_control_folds_both_keys_into_one_button(self):
         quit_buttons = [b for b in self.bar.buttons if b.action == "quit"]
@@ -60,7 +67,7 @@ class ButtonSetTest(unittest.TestCase):
 
     def test_the_bar_has_four_rows_of_the_documented_size(self):
         self.assertEqual(len(keybar.ROW_ACTIONS), 4)
-        self.assertEqual([len(row) for row in rows(self.bar)], [7, 10, 12, 6])
+        self.assertEqual([len(row) for row in rows(self.bar)], list(ROW_COUNTS))
 
 
 class LayoutTest(unittest.TestCase):

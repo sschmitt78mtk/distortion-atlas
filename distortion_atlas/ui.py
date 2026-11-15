@@ -10,15 +10,17 @@ exported buffer free of the readout overlay by construction (design D6).
 from __future__ import annotations
 
 import argparse
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 
-from . import calibration, export
+from . import blindspot, calibration, export
 from .fixation import apply_fixation
 from .geometry import FieldFit, Scale, fit_field
 from .params import Grade, Params, apply_control, lookup
+from .patterns import blindspot as blindspot_patterns
 from .patterns import dials, glare, grids, targets
 
 #: Height of the readout strip, in pixels.
@@ -138,6 +140,7 @@ class Session:
         self.last_fit: FieldFit | None = None
         self.shown_family: str | None = None
         self.buffer: np.ndarray | None = None
+        self.scotoma: blindspot.BlindSpotTest | None = None
         self.self_check = check_pixel_path((self.width, self.height))
         self.reliable = True
         self.export_dir = (
@@ -223,6 +226,33 @@ class Session:
         family = params.family
         width, height = self.width, self.height
 
+        test = self.scotoma
+        if test is not None:
+            self.last_fit = None
+            if test.finished:
+                frame = blindspot_patterns.render_results_frame(
+                    params,
+                    width,
+                    height,
+                    test.positions,
+                    test.results(self.scale),
+                    lattice=test.lattice,
+                    settings=test.settings,
+                )
+            else:
+                frame = blindspot_patterns.render_test_frame(
+                    params,
+                    width,
+                    height,
+                    test.positions,
+                    lit=test.current if test.lit else None,
+                    settings=test.settings,
+                )
+            frame = apply_fixation(frame, params)
+            self.buffer = frame
+            self.shown_family = family
+            return frame
+
         if family == "amsler":
             fit = self.field_fit()
             frame = grids.render_amsler(params, width, height, extent_px=fit.pixels)
@@ -254,6 +284,10 @@ class Session:
 
     def presented(self) -> np.ndarray:
         """The frame the observer sees: pattern plus optional readout strip."""
+        test = self.scotoma
+        if test is not None and not test.finished and test.lit:
+            # A lit dot is judged on its own: no strip may cover the stimulus.
+            return self.render()
         frame = self.render() if self.buffer is None else self.buffer
         if not self.params.overlay:
             return frame
@@ -267,6 +301,11 @@ class Session:
 
     def overlay_text(self) -> str:
         """The single status line; painted by the backend, never exported."""
+        test = self.scotoma
+        if test is not None and not test.finished:
+            return self._scotoma_overlay_text(test)
+        if test is not None:
+            return self._scotoma_results_text(test)
         params = self.params
         scale = self.scale
         eye = params.eye if params.eye != "both" else "both eyes"
@@ -301,9 +340,63 @@ class Session:
         parts.append("not a medical device")
         return " | ".join(parts)
 
+    def _scotoma_context(self) -> list[str]:
+        """Distance, scale and eye context shared by both test readouts."""
+        params = self.params
+        scale = self.scale
+        eye = params.eye if params.eye != "both" else "both eyes"
+        reminder = (
+            f" — {MONOCULAR_REMINDER}"
+            if params.eye in ("left", "right", "both")
+            else ""
+        )
+        source = "calibrated" if scale.source == "calibrated" else "UNCALIBRATED"
+        return [
+            f"{params.distance_mm:.0f} mm {scale.arcmin_per_px:.2f}′/px ({source})",
+            f"eye {eye}{reminder}",
+        ]
+
+    def _scotoma_overlay_text(self, test: blindspot.BlindSpotTest) -> str:
+        parts = [test.progress_text()]
+        if test.paused:
+            parts.append("PAUSED — press p to resume")
+        parts.extend(self._scotoma_context())
+        parts.append("photosensitivity: flashing dots")
+        parts.append("Space seen | p pause | q results")
+        if self.message:
+            parts.append(self.message)
+        if not self.reliable:
+            parts.append("PIXEL PATH UNRELIABLE")
+        parts.append("not a medical device")
+        return " | ".join(parts)
+
+    def _scotoma_results_text(self, test: blindspot.BlindSpotTest) -> str:
+        counts = test.counts()
+        summary = test.results(self.scale)
+        parts = [
+            "scotoma results: "
+            f"{counts['seen']} seen | {counts['blind']} blind | "
+            f"{counts['untested']} untested",
+            f"inner ring {summary['central_seen']} seen",
+        ]
+        if not summary["interpretable"]:
+            parts.insert(0, "NOT INTERPRETABLE — too few inner-ring dots seen")
+        parts.extend(self._scotoma_context())
+        parts.append("photosensitivity: flashing dots")
+        parts.append("s export | b restart | q quit")
+        if self.message:
+            parts.append(self.message)
+        if not self.reliable:
+            parts.append("PIXEL PATH UNRELIABLE")
+        parts.append("not a medical device")
+        return " | ".join(parts)
+
     # -- key dispatch -------------------------------------------------------
     def handle_key(self, key: str, coarse: bool = False) -> ActionResult:
         """Apply one key press and re-render immediately."""
+        test = self.scotoma
+        if test is not None and not test.finished:
+            return self._handle_scotoma_key(key)
         control = lookup(key)
         if control is None:
             self.message = f"key {key!r} is not mapped"
@@ -330,6 +423,9 @@ class Session:
             )
             self.render()
             return ActionResult(True, self.message)
+        if action == "blindspot":
+            self.start_scotoma_test()
+            return ActionResult(True, self.message, "blindspot_started")
         if action == "export":
             return self._handle_export()
         if action == "grade":
@@ -343,10 +439,100 @@ class Session:
         self.render()
         return ActionResult(True, message)
 
+    # -- scotoma test -------------------------------------------------------
+    def start_scotoma_test(
+        self,
+        settings: blindspot.BlindSpotSettings | None = None,
+        now_ms: float | None = None,
+    ) -> blindspot.BlindSpotTest:
+        """Replace the displayed pattern with a new dot-by-dot test run."""
+        now = (
+            time.monotonic() * 1000.0 if now_ms is None else float(now_ms)
+        )
+        # The fixation mark is part of the stimulus; it cannot be off by accident.
+        self.params.fixation_visible = True
+        self.scotoma = blindspot.BlindSpotTest(
+            settings,
+            width=self.width,
+            height=self.height,
+            dot_pitch=int(self.params.dot_pitch),
+            now_ms=now,
+        )
+        self.message = (
+            "scotoma test started — Space when a dot appears, p pauses, q finishes"
+        )
+        self.hide_key_bar()
+        self.render()
+        return self.scotoma
+
+    def tick_scotoma_test(self, now_ms: float | None = None) -> bool:
+        """Sample the test clock; repaint only when the presented frame changes."""
+        test = self.scotoma
+        if test is None or test.finished:
+            return False
+        now = time.monotonic() * 1000.0 if now_ms is None else float(now_ms)
+        changed = test.tick(now)
+        if changed:
+            if test.finished:
+                self.message = "scotoma test finished — s exports, b restarts"
+            self.render()
+        return changed
+
+    def _handle_scotoma_key(self, key: str) -> ActionResult:
+        """The whole key contract while a test is running (design D10)."""
+        test = self.scotoma
+        assert test is not None
+        now = time.monotonic() * 1000.0
+        if key == "Space":
+            scored = test.respond(now)
+            if scored:
+                latency = test.last_latency_ms
+                self.message = (
+                    f"seen ({latency} ms)" if latency is not None else "seen"
+                )
+                self.render()
+            else:
+                self.message = "no dot lit — press Space when a dot appears"
+            return ActionResult(scored, self.message, "scotoma_response")
+        if key == "p":
+            if test.paused:
+                test.resume(now)
+                self.message = "test resumed — a fresh gap follows"
+            else:
+                test.pause(now)
+                self.message = "test paused — press p to resume"
+            self.render()
+            return ActionResult(True, self.message, "scotoma_pause")
+        if key == "q":
+            test.stop(now)
+            self.message = "scotoma test finished — s exports, b restarts"
+            self.render()
+            return ActionResult(True, self.message, "scotoma_stop")
+        if key == "f":
+            self.fullscreen = not self.fullscreen
+            self.message = "windowed" if not self.fullscreen else "fullscreen"
+            return ActionResult(True, self.message, "toggle_fullscreen")
+        if key == "Esc":
+            self.running = False
+            return ActionResult(True, "quit", "quit")
+        if key == "s":
+            self.message = (
+                "the scotoma test must end before export — press q for the results"
+            )
+            return ActionResult(False, self.message, "export_refused")
+        self.message = (
+            "scotoma test running — Space seen, p pause, q finish, f fullscreen, "
+            "Esc quit"
+        )
+        return ActionResult(False, self.message, "scotoma_ignored")
+
     # -- key bar ------------------------------------------------------------
     @property
     def key_bar_allowed(self) -> bool:
         """Whether the bar may be shown for the pattern on screen (D8)."""
+        test = self.scotoma
+        if test is not None and not test.finished:
+            return False
         return self.params.family != "selfcheck"
 
     def show_key_bar(self) -> bool:
@@ -449,6 +635,17 @@ class Session:
         panel: dict | None = None,
     ) -> export.ExportResult:
         """Write PNG plus JSON; a failure leaves the session untouched."""
+        test = self.scotoma
+        if test is not None and not test.finished:
+            result = export.ExportResult(
+                ok=False,
+                error="finish the scotoma test before exporting",
+                attempted_dir=(
+                    Path(directory) if directory is not None else self.export_dir
+                ),
+            )
+            self.message = result.message()
+            return result
         result = export.export_session(
             self, directory=directory, timestamp=timestamp, panel=panel
         )

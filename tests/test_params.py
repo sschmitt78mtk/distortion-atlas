@@ -49,6 +49,7 @@ class ControlMapTest(unittest.TestCase):
             "grade",
             "overlay",
             "fixation",
+            "blindspot",
             "export",
             "fullscreen",
             "reset",

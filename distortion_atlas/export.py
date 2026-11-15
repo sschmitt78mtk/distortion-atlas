@@ -27,8 +27,9 @@ DISCLAIMER = (
 )
 NON_DIAGNOSTIC = "Not a medical device — this record is an observation aid only."
 PHOTOSENSITIVITY_WARNING = (
-    "All current patterns are static. Any future flashing content would carry a "
-    "photosensitivity risk."
+    "The scotoma test presents flashing dots — one lit dot at a time in a random "
+    "sequence — and therefore carries a photosensitivity risk. Stop if you feel "
+    "discomfort."
 )
 
 #: EDID of the target panel; read for the panel identity in the record.
@@ -171,7 +172,7 @@ def build_record(
     check = getattr(session, "self_check", None)
     fit = getattr(session, "last_fit", None)
 
-    return {
+    record = {
         "tool": {"name": TOOL_NAME, "version": TOOL_VERSION},
         "generated_at": (timestamp or datetime.now()).isoformat(timespec="seconds"),
         "disclaimer": DISCLAIMER,
@@ -213,6 +214,17 @@ def build_record(
         "grades": [grade.to_dict() for grade in session.ordered_grades()],
         "overlay_text": session.overlay_text(),
     }
+    test = getattr(session, "scotoma", None)
+    if test is not None:
+        blindspot = test.record(session.scale)
+        blindspot["context"] = {
+            "eye": params.eye,
+            "correction": "worn" if params.correction else "not worn",
+            "distance_mm": float(params.distance_mm),
+        }
+        blindspot["caveat"] = NON_DIAGNOSTIC
+        record["blindspot"] = blindspot
+    return record
 
 
 def export_session(

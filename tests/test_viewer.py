@@ -121,6 +121,33 @@ class ViewerTest(unittest.TestCase):
         self.assertEqual(result.action, "quit")
         self.assertFalse(self.session.running)
 
+    def test_the_scotoma_run_starts_and_stops_the_sampling_timer(self):
+        result = self.presenter.dispatch("b")
+        self.assertEqual(result.action, "blindspot_started")
+        self.assertTrue(self.presenter.widget._stimulus_timer.isActive())
+        self.presenter.dispatch("q")
+        self.assertFalse(self.presenter.widget._stimulus_timer.isActive())
+
+    def test_a_left_click_responds_while_a_dot_is_lit(self):
+        from PyQt6.QtTest import QTest
+
+        self.presenter.dispatch("b")
+        widget = self.presenter.widget
+        widget._stimulus_timer.stop()
+        test = self.session.scotoma
+        now = time.monotonic() * 1000.0
+        test.gap_end_ms = now - 1.0
+        self.assertTrue(test.tick(now))
+        self.assertTrue(test.lit)
+        QTest.mouseClick(
+            widget,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            QPoint(SIDE // 2, SIDE // 2),
+        )
+        self.assertEqual(test.counts()["seen"], 1)
+        self.presenter.dispatch("q")
+
     def test_hold_zero_returns_without_waiting(self):
         self.presenter.show(self.session.presented())
         started = time.monotonic()
@@ -440,6 +467,9 @@ class KeyMappingTest(unittest.TestCase):
         self.assertEqual(key_name(self._event(Qt.Key.Key_5, text="5")), "5")
         self.assertEqual(key_name(self._event(Qt.Key.Key_Escape)), "Esc")
         self.assertEqual(key_name(self._event(Qt.Key.Key_Backtab)), "Shift+Tab")
+
+    def test_space_is_named_for_the_scotoma_response(self):
+        self.assertEqual(key_name(self._event(Qt.Key.Key_Space, text=" ")), "Space")
 
     def test_arrows_and_brackets_are_named(self):
         self.assertEqual(key_name(self._event(Qt.Key.Key_Up)), "Up")
