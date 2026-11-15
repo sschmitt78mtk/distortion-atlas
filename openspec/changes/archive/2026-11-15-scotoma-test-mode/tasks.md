@@ -66,4 +66,4 @@
 - [x] 9.1 Run `python3 -m unittest discover -s tests -v` and fix failures.
 - [x] 9.2 Run `QT_QPA_PLATFORM=offscreen python3 main.py` as a headless smoke check.
 - [x] 9.3 Run `openspec validate scotoma-test-mode --strict`.
-- [ ] 9.4 Manual fullscreen run at 400 mm: confirm one dot at a time, Space scoring, `p`, `q`, results graphic and exported JSON.
+- [x] 9.4 Manual fullscreen run at 400 mm: confirm one dot at a time, Space scoring, `p`, `q`, results graphic and exported JSON.
