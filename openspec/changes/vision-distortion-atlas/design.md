@@ -60,9 +60,11 @@ Coordinates are computed as `x - cx` with integer offsets, and grid lines use a 
 
 All patterns are static, so there is no animation loop: a key event mutates `Params`, the pattern is re-rendered, and the presenter blits. Budget: full 1080p grid render plus blit under ~30 ms so key repeat feels continuous. Coordinate index grids (`xx`, `yy`, radial `r`) are cached per buffer size in `float32`; that is the only optimisation worth doing up front.
 
-### D6 — One status line, no chrome
+### D6 — One status line, no permanent chrome
 
 The overlay is a single semi-transparent text strip at the top plus the grading state, drawn into the *presented* buffer only, never into the buffer that is exported. This keeps the "exported image matches the display" requirement true by construction.
+
+Amended by `on-screen-key-bar` (D2/D4): a key bar may additionally be painted *over the window* while the pointer is in play and is hidden again after 3 s without pointer activity, and it is never drawn for the self-check pattern. Like the readout it is chrome only — it never enters the presented buffer, the exported PNG, the session record or the pixel-path comparison — so "no chrome" still holds for observation and export; the only difference is the transient band while the bar is revealed.
 
 ### D7 — Tests with stdlib `unittest`
 

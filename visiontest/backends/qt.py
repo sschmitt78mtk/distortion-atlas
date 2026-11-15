@@ -15,11 +15,32 @@ from pathlib import Path
 
 import numpy as np
 
+from .. import keybar
+from ..ui import (
+    OVERLAY_ALPHA,
+    OVERLAY_BACKGROUND,
+    OVERLAY_TEXT_COLOUR,
+)
+
 #: Font size of the readout line, in points.
 OVERLAY_FONT_POINTS = 11
 
 #: Where the readout line starts inside the strip.
 OVERLAY_TEXT_ORIGIN = (8, 18)
+
+#: Slot tint of an active button, as RGBA.
+BAR_ACTIVE_COLOUR = (64, 64, 64, 210)
+
+#: Slot tint of the button under the pointer, as RGBA.
+BAR_HOVER_COLOUR = (96, 96, 96, 210)
+
+#: Press-and-hold repeat: first delay, then the interval, in milliseconds (D7).
+REPEAT_DELAY_MS = 400
+REPEAT_INTERVAL_MS = 80
+
+#: Default idle time after which the bar hides, in milliseconds (D4).
+KEY_BAR_IDLE_MS = 3000
+
 
 #: GNOME schema whose keys Qt 6.6 still reads from the pre-45 location.
 XSETTINGS_SCHEMA = "org.gnome.settings-daemon.plugins.xsettings"
@@ -180,12 +201,10 @@ def is_coarse(event, name: str) -> bool:
 class _ViewerWindow:
     """Factory wrapper so Qt is imported only when a window is built."""
 
-    def __init__(self, session):
-        from PyQt6.QtCore import QPoint, Qt
+    def __init__(self, session, key_bar_idle_ms: int = KEY_BAR_IDLE_MS):
+        from PyQt6.QtCore import QPoint, QRect, Qt, QTimer
         from PyQt6.QtGui import QColor, QImage, QPainter
         from PyQt6.QtWidgets import QApplication, QWidget
-
-        from ..ui import OVERLAY_TEXT_COLOUR
 
         self.session = session
         outer = self
@@ -197,9 +216,28 @@ class _ViewerWindow:
                 self._buffer = None
                 self._image = None
                 self.hold_until_key = False
+                self._hover_key = None
+                self._repeat_button = None
+                self._repeat_coarse = False
                 self.setWindowTitle("visiontest")
+                self.setMouseTracking(True)
                 self.setCursor(Qt.CursorShape.BlankCursor)
 
+                self._idle_timer = QTimer(self)
+                self._idle_timer.setSingleShot(True)
+                self._idle_timer.setInterval(int(key_bar_idle_ms))
+                self._idle_timer.timeout.connect(self._idle)
+
+                # Press-and-hold: one delay timer, then a repeating ticker.
+                self._repeat_delay_timer = QTimer(self)
+                self._repeat_delay_timer.setSingleShot(True)
+                self._repeat_delay_timer.setInterval(REPEAT_DELAY_MS)
+                self._repeat_delay_timer.timeout.connect(self._begin_repeat)
+                self._repeat_timer = QTimer(self)
+                self._repeat_timer.setInterval(REPEAT_INTERVAL_MS)
+                self._repeat_timer.timeout.connect(self._repeat_step)
+
+            # -- buffer and painting ---------------------------------------
             def set_buffer(self, buffer: np.ndarray) -> None:
                 array = np.ascontiguousarray(buffer)
                 height, width = array.shape[:2]
@@ -223,7 +261,116 @@ class _ViewerWindow:
                     painter.setFont(font)
                     painter.setPen(QColor(*OVERLAY_TEXT_COLOUR))
                     painter.drawText(*OVERLAY_TEXT_ORIGIN, self.session.overlay_text())
+                if self._bar_shown():
+                    self._paint_bar(painter)
                 painter.end()
+
+            # -- key bar ---------------------------------------------------
+            def _bar(self):
+                return keybar.build(
+                    self.width(), self.height(), outer.session.key_bar_state()
+                )
+
+            def _bar_shown(self) -> bool:
+                return (
+                    outer.session.key_bar_visible
+                    and outer.session.key_bar_allowed
+                    and not self.hold_until_key
+                )
+
+            def _paint_bar(self, painter) -> None:
+                bar = self._bar()
+                panel = QColor(*OVERLAY_BACKGROUND)
+                panel.setAlphaF(OVERLAY_ALPHA)
+                painter.fillRect(QRect(*bar.rect), panel)
+                caption_font = painter.font()
+                caption_font.setPointSize(OVERLAY_FONT_POINTS)
+                hint_font = painter.font()
+                hint_font.setPointSize(max(6, OVERLAY_FONT_POINTS - 4))
+                active_tint = QColor(*BAR_ACTIVE_COLOUR)
+                hover_tint = QColor(*BAR_HOVER_COLOUR)
+                for button in bar.buttons:
+                    rect = QRect(*button.rect)
+                    if button.active:
+                        painter.fillRect(rect, active_tint)
+                    elif (button.action, button.key) == self._hover_key:
+                        painter.fillRect(rect, hover_tint)
+                    painter.setPen(QColor(*OVERLAY_TEXT_COLOUR))
+                    if button.hint and button.hint != button.caption:
+                        split = int(button.rect[3] * 0.62)
+                        left, top, width, height = button.rect
+                        caption_rect = QRect(left, top, width, split)
+                        hint_rect = QRect(left, top + split, width, height - split)
+                        painter.setFont(hint_font)
+                        painter.drawText(
+                            hint_rect, Qt.AlignmentFlag.AlignCenter, button.hint
+                        )
+                        painter.setFont(caption_font)
+                        painter.drawText(
+                            caption_rect, Qt.AlignmentFlag.AlignCenter, button.caption
+                        )
+                    else:
+                        painter.setFont(caption_font)
+                        painter.drawText(
+                            rect, Qt.AlignmentFlag.AlignCenter, button.caption
+                        )
+
+            # -- pointer, cursor and timers --------------------------------
+            def _apply_cursor(self) -> None:
+                if not self._bar_shown():
+                    self.setCursor(Qt.CursorShape.BlankCursor)
+                elif self._hover_key is not None:
+                    self.setCursor(Qt.CursorShape.PointingHandCursor)
+                else:
+                    self.setCursor(Qt.CursorShape.ArrowCursor)
+
+            def _reveal(self) -> None:
+                if self.hold_until_key or not outer.session.show_key_bar():
+                    self._hover_key = None
+                    self._apply_cursor()
+                    return
+                self._idle_timer.start()
+                self._apply_cursor()
+                self.update()
+
+            def _idle(self) -> None:
+                if self._repeat_button is not None:
+                    # A held step button is still pointer activity (D7).
+                    self._idle_timer.start()
+                    return
+                outer.session.hide_key_bar()
+                self._hover_key = None
+                self._stop_repeat()
+                self._apply_cursor()
+                self.update()
+
+            def _button_at(self, position):
+                if not self._bar_shown():
+                    return None
+                return keybar.hit_test(self._bar(), position.x(), position.y())
+
+            # -- dispatch --------------------------------------------------
+            def _dispatch(self, name: str, coarse: bool = False):
+                if not name:
+                    return None
+                result = outer.session.handle_key(name, coarse)
+                if result.action == "quit" or not outer.session.running:
+                    self.close()
+                    QApplication.quit()
+                    return result
+                if result.action == "toggle_fullscreen":
+                    if outer.session.fullscreen:
+                        self.showFullScreen()
+                    else:
+                        self.resize(self.session.width, self.session.height)
+                        self.showNormal()
+                if not outer.session.key_bar_allowed:
+                    outer.session.hide_key_bar()
+                    self._hover_key = None
+                    self._stop_repeat()
+                self.set_buffer(outer.session.presented())
+                self._apply_cursor()
+                return result
 
             def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt naming)
                 if self.hold_until_key:
@@ -233,20 +380,63 @@ class _ViewerWindow:
                 name = key_name(event)
                 if not name:
                     return
-                result = outer.session.handle_key(name, is_coarse(event, name))
-                if result.action == "quit" or not outer.session.running:
+                self._dispatch(name, is_coarse(event, name))
+
+            # -- mouse -----------------------------------------------------
+            def mouseMoveEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+                self._reveal()
+                button = self._button_at(event.position())
+                hover = (button.action, button.key) if button is not None else None
+                changed = hover != self._hover_key
+                self._hover_key = hover
+                if changed:
+                    self._apply_cursor()
+                    self.update()
+
+            def mousePressEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+                if event.button() != Qt.MouseButton.LeftButton:
+                    return
+                if self.hold_until_key:
                     self.close()
                     QApplication.quit()
                     return
-                if result.action == "toggle_fullscreen":
-                    if outer.session.fullscreen:
-                        self.showFullScreen()
-                    else:
-                        self.resize(self.session.width, self.session.height)
-                        self.showNormal()
-                self.set_buffer(outer.session.presented())
+                self._reveal()
+                button = self._button_at(event.position())
+                if button is None:
+                    self.update()
+                    return
+                coarse = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+                self._dispatch(button.key, coarse)
+                if button.repeatable and outer.session.running and self._bar_shown():
+                    self._repeat_button = button
+                    self._repeat_coarse = coarse
+                    self._repeat_delay_timer.start()
+
+            def mouseReleaseEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self._stop_repeat()
+
+            def _begin_repeat(self) -> None:
+                if self._repeat_button is not None and outer.session.running:
+                    self._repeat_timer.start()
+
+            def _repeat_step(self) -> None:
+                if (
+                    self._repeat_button is None
+                    or not outer.session.running
+                    or not self._bar_shown()
+                ):
+                    self._stop_repeat()
+                    return
+                self._dispatch(self._repeat_button.key, self._repeat_coarse)
+
+            def _stop_repeat(self) -> None:
+                self._repeat_delay_timer.stop()
+                self._repeat_timer.stop()
+                self._repeat_button = None
 
             def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+                self._stop_repeat()
                 QApplication.quit()
                 super().closeEvent(event)
 
@@ -256,10 +446,16 @@ class _ViewerWindow:
 class QtPresenter:
     """Presents session buffers fullscreen, one image pixel per screen pixel."""
 
-    def __init__(self, session, app=None, fullscreen: bool = True) -> None:
+    def __init__(
+        self,
+        session,
+        app=None,
+        fullscreen: bool = True,
+        key_bar_idle_ms: int = KEY_BAR_IDLE_MS,
+    ) -> None:
         self.session = session
         self.app = app if app is not None else create_application()
-        self._window = _ViewerWindow(session)
+        self._window = _ViewerWindow(session, key_bar_idle_ms=key_bar_idle_ms)
         self.widget = self._window.widget
         if fullscreen:
             # Size the surface to the whole screen before it is mapped, so the

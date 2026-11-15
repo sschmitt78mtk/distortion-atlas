@@ -98,11 +98,25 @@ and applies it itself, so no environment variable is required (see
 Families without a secondary control (halo, veil, self-check) say so in the
 readout instead of moving something silently.
 
+## Pointer controls
+
+Moving the pointer reveals a key bar along the bottom edge: one button for every
+key above, captioned with its action and hinting the key it stands for. The bar
+disappears after 3 seconds without pointer activity, and pressing a key never
+reveals it, so observation stays chrome-free. A click dispatches the same key
+string as the keyboard, `Shift`+click applies the coarse step and holding a step
+button repeats it at the keyboard's auto-repeat cadence. The bar is never drawn
+for the pixel-path self-check (`c`), so that frame can still be judged by eye
+without chrome. No touch input is required or handled.
+
 ## What gets exported
 
 `s` writes `<tool>-<YYYYmmdd-HHMMSS>.png` and `.json` into `exports/` (or
-`--export-dir`). The PNG is the rendered buffer **without** the readout strip,
-so it is pixel-identical to the pattern on screen. The JSON record contains the
+`--export-dir`). The PNG is the rendered buffer **without** the readout strip or
+the transient pointer-only key bar, so it is pixel-identical to the rendered
+pattern itself. The only on-screen pixels that differ from the exported image are
+the readout strip and, while the bar is revealed, the bottom band it covers.
+The JSON record contains the
 pattern parameters, every scale value with its `calibrated`/`panel_derived`
 source, the eye, correction state, ambient note, viewing distance, all grades
 (with regrade counts), display-limited contrast flags, the panel identity, the

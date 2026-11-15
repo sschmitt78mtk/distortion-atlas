@@ -150,6 +150,7 @@ class Session:
         self.message = ""
         self.running = True
         self.fullscreen = True
+        self.key_bar_visible = False
         self.notice = STARTUP_NOTICE
         if self.params.eye in ("left", "right"):
             self.message = MONOCULAR_REMINDER
@@ -345,6 +346,37 @@ class Session:
         self.message = message
         self.render()
         return ActionResult(True, message)
+
+    # -- key bar ------------------------------------------------------------
+    @property
+    def key_bar_allowed(self) -> bool:
+        """Whether the bar may be shown for the pattern on screen (D8)."""
+        return self.params.family != "selfcheck"
+
+    def show_key_bar(self) -> bool:
+        """Reveal the bar; refused while the self-check pattern is displayed."""
+        if not self.key_bar_allowed:
+            self.key_bar_visible = False
+            return False
+        self.key_bar_visible = True
+        return True
+
+    def hide_key_bar(self) -> None:
+        """Hide the bar again; the cursor follows the visibility flag."""
+        self.key_bar_visible = False
+
+    def key_bar_state(self) -> dict:
+        """Snapshot of the values the bar's buttons display (design D9)."""
+        params = self.params
+        grade = self.grades.get((params.family, params.current_item(), params.eye))
+        return {
+            "family": params.family,
+            "eye": params.eye,
+            "correction": bool(params.correction),
+            "overlay": bool(params.overlay),
+            "fixation_visible": bool(params.fixation_visible),
+            "grade": grade.value if grade is not None else None,
+        }
 
     # -- grading ------------------------------------------------------------
     def geometry_snapshot(self) -> dict:
