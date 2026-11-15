@@ -36,7 +36,7 @@
 
 ## 6. Integration on the real panel
 
-- [ ] 6.1 Run `main.py` fullscreen on the target panel and confirm the self-check reports an unscaled 1:1 path; verify by eye that the checkerboard reads as uniform mid-grey and by readout that surface size equals buffer size
+- [ ] 6.1 Run `main.py` fullscreen on the target panel and confirm the self-check reports an unscaled 1:1 path; verify by eye that the checkerboard reads as uniform mid-grey and by readout that surface size equals buffer size (the checkerboard stays on screen until a key press, so there is time to look)
 - [ ] 6.2 Walk the calibration flow with a ruler against the screen and confirm all reported millimetre and degree values change consistently afterwards; verify a 100 mm bar measures 100 mm on the ruler and that the JSON record marks the scale as calibrated
 - [ ] 6.3 Exercise every pattern family at 300–600 mm with one eye covered, grading at least one item per family, and confirm each satisfies its scenario in `openspec/changes/vision-distortion-atlas/specs/`; verify `openspec validate vision-distortion-atlas --strict` passes alongside the visual check
 - [ ] 6.4 Export a session and compare the PNG against the on-screen image; verify identical dimensions, identical pattern content, no overlay, and a JSON record that names the eye, distance, scale source and every grade

@@ -28,13 +28,19 @@ below work with or without an active venv.
 ## Quick start
 
 ```bash
-python3 main.py --self-check    # non-graphical readout: panel, scale, field fit
-python3 main.py                 # fullscreen viewer
+python3 main.py --self-check           # readout + checkerboard, closes on a key press
+python3 main.py --self-check --hold 0  # same readout, no wait (scripted runs)
+python3 main.py                        # fullscreen viewer
 ```
 
-Both commands print the non-diagnostic and photosensitivity notice before
-anything is drawn. On this desktop Qt 6.6 needs a GLib schema shim; `main.py`
-detects that and applies it itself, so no environment variable is required (see
+`--self-check` prints the panel, scale, field fit and pixel-path readout, then
+keeps the checkerboard on screen so the presented pixels can actually be judged:
+any key closes it, `--hold SECONDS` bounds the wait, `--hold 0` returns straight
+away.
+
+All commands print the non-diagnostic and photosensitivity notice before anything
+is drawn. On this desktop Qt 6.6 needs a GLib schema shim; `main.py` detects that
+and applies it itself, so no environment variable is required (see
 **Troubleshooting**).
 
 ## First-run walkthrough
@@ -46,6 +52,9 @@ detects that and applies it itself, so no environment variable is required (see
    (`/sys/class/drm/card1-eDP-1/edid`, `B156HAN12.H` on the target), the
    pixels-per-millimetre value, whether that value is `calibrated` or
    `panel_derived`, and the field that will fit (`20 squares @ 39 px = 19.7°`).
+   The checkerboard then stays on screen until a key press, so the readout strip
+   and the grey field can be read without hurrying; `--hold 5` bounds it to five
+   seconds.
 3. Start the viewer with `python3 main.py`, then press `x` twice to watch the
    fixation mark disappear and return, and `c` to show the one-pixel
    checkerboard. At 1:1 it reads as uniform mid-grey; a moiré or a visible
@@ -157,7 +166,7 @@ The shim also works manually, and is not needed at all with PyQt6 6.7 or newer:
 
 ```bash
 glib-compile-schemas qtshim
-GSETTINGS_SCHEMA_DIR=qtshim python3 main.py --self-check
+GSETTINGS_SCHEMA_DIR=qtshim python3 main.py --self-check --hold 0
 ```
 
 With the shim, `--self-check` reports

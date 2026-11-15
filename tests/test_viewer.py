@@ -1,6 +1,7 @@
 """Offscreen viewer tests: presentation, key dispatch, pixel-path guard (4.3/4.4)."""
 
 import os
+import time
 import unittest
 
 import numpy as np
@@ -83,6 +84,34 @@ class ViewerTest(unittest.TestCase):
         result = self.presenter.dispatch("q")
         self.assertEqual(result.action, "quit")
         self.assertFalse(self.session.running)
+
+    def test_hold_zero_returns_without_waiting(self):
+        self.presenter.show(self.session.presented())
+        started = time.monotonic()
+        self.presenter.hold(0)
+        self.assertLess(time.monotonic() - started, 0.5)
+        self.assertTrue(self.presenter.widget.isVisible())
+
+    def test_a_timed_hold_returns_after_the_delay(self):
+        self.presenter.show(self.session.presented())
+        started = time.monotonic()
+        self.presenter.hold(0.05)
+        elapsed = time.monotonic() - started
+        self.assertGreaterEqual(elapsed, 0.03)
+        self.assertLess(elapsed, 5.0)
+        self.assertFalse(self.presenter.widget.isVisible())
+
+    def test_a_hold_until_key_ends_on_any_key(self):
+        from PyQt6.QtCore import QTimer
+        from PyQt6.QtTest import QTest
+
+        self.presenter.show(self.session.presented())
+        widget = self.presenter.widget
+        QTimer.singleShot(50, lambda: QTest.keyClick(widget, Qt.Key.Key_Space))
+        self.presenter.hold(None)
+        self.assertFalse(widget.isVisible())
+        # A key pressed during the hold must not reach the session.
+        self.assertEqual(self.session.params.family, "amsler")
 
     def test_a_real_key_event_reaches_the_session(self):
         from PyQt6.QtTest import QTest

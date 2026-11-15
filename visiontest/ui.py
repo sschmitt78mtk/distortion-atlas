@@ -434,6 +434,36 @@ class Session:
         )
 
 
+def _parse_hold(text: str):
+    """``key`` waits for a key press, a number waits that many seconds."""
+    if text.strip().lower() == "key":
+        return None
+    try:
+        seconds = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"expected 'key' or a number of seconds, got {text!r}"
+        ) from None
+    if seconds < 0:
+        raise argparse.ArgumentTypeError("hold seconds cannot be negative")
+    return seconds
+
+
+def _describe_hold(hold) -> str:
+    """The hint printed next to the self-check checkerboard."""
+    if hold is None:
+        return (
+            "hold: checkerboard stays on screen until a key press "
+            "(--hold 0 to exit immediately)"
+        )
+    if hold <= 0:
+        return "hold: checkerboard closes immediately (--hold key to keep it on screen)"
+    return (
+        f"hold: checkerboard stays on screen for {hold:g} s "
+        "(--hold key to wait for a key press)"
+    )
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="visiontest",
@@ -446,7 +476,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--self-check",
         action="store_true",
-        help="print the panel, scale and pixel-path readout, then exit",
+        help=(
+            "print the panel, scale and pixel-path readout, hold the "
+            "checkerboard for the time given by --hold, then exit"
+        ),
+    )
+    parser.add_argument(
+        "--hold",
+        type=_parse_hold,
+        default=None,
+        metavar="{key|SECONDS}",
+        help=(
+            "how long --self-check keeps the checkerboard on screen: 'key' "
+            "(the default) waits for a key press, a number waits that many "
+            "seconds, 0 exits immediately for scripted runs"
+        ),
     )
     parser.add_argument(
         "--distance",
@@ -500,7 +544,8 @@ def _build_session(
 
 
 def _run_self_check(args: argparse.Namespace) -> int:
-    """Report the panel, scale, field fit and pixel path, then exit."""
+    """Report the panel, scale, field fit and pixel path, then hold the frame."""
+    hold = getattr(args, "hold", None)
     app = None
     try:
         from .backends.qt import QtPresenter, configure_scaling, create_application
@@ -539,6 +584,7 @@ def _run_self_check(args: argparse.Namespace) -> int:
     )
 
     session.handle_key("c")  # the one-pixel checkerboard
+    print(f"readout: {session.overlay_text()}")
 
     if app is not None:
         presenter = QtPresenter(session, app=app)
@@ -552,12 +598,12 @@ def _run_self_check(args: argparse.Namespace) -> int:
             "by eye: the checkerboard should read as uniform mid-grey; "
             "any moiré means the pixel path is being scaled"
         )
-        presenter.close()
+        print(_describe_hold(hold), flush=True)
+        presenter.hold(hold)
         app.processEvents()
     else:
         print(f"pixel path: {session.self_check.message}")
 
-    print(f"readout: {session.overlay_text()}")
     return 0
 
 

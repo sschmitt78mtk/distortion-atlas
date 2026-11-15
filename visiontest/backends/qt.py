@@ -196,6 +196,7 @@ class _ViewerWindow:
                 self.session = session
                 self._buffer = None
                 self._image = None
+                self.hold_until_key = False
                 self.setWindowTitle("visiontest")
                 self.setCursor(Qt.CursorShape.BlankCursor)
 
@@ -225,6 +226,10 @@ class _ViewerWindow:
                 painter.end()
 
             def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+                if self.hold_until_key:
+                    self.close()
+                    QApplication.quit()
+                    return
                 name = key_name(event)
                 if not name:
                     return
@@ -240,6 +245,10 @@ class _ViewerWindow:
                         self.resize(self.session.width, self.session.height)
                         self.showNormal()
                 self.set_buffer(outer.session.presented())
+
+            def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+                QApplication.quit()
+                super().closeEvent(event)
 
         self.widget = Window()
 
@@ -298,6 +307,25 @@ class QtPresenter:
 
     def run(self) -> int:
         return int(self.app.exec())
+
+    def hold(self, seconds: float | None = None) -> None:
+        """Keep the current frame on screen, then close the window.
+
+        ``None`` waits for a key press or the window's close button, ``0``
+        returns without starting an event loop and a positive number waits that
+        many seconds. Used by ``--self-check``, whose whole point is to let an
+        observer judge the presented pixels.
+        """
+        from PyQt6.QtCore import QTimer
+
+        if seconds is not None and seconds <= 0:
+            return
+        if seconds is None:
+            self.widget.hold_until_key = True
+        else:
+            QTimer.singleShot(int(round(seconds * 1000)), self.app.quit)
+        self.app.exec()
+        self.close()
 
     def close(self) -> None:
         self.widget.close()
