@@ -1,0 +1,10 @@
+# Runtime dependencies for the distortion atlas.
+# Activate a virtualenv first: `.venv/bin/activate` or `python3 -m venv .venv`.
+numpy==1.26.4
+Pillow==10.2.0
+# PyQt6 (bindings) and PyQt6-Qt6 (Qt runtime) are separate wheels and must stay
+# in the same minor series. Mismatch symptom: no window at all, QtGui.abi3.so
+# "undefined symbol: _ZN5QFont11tagToStringEj, version Qt_6".
+PyQt6==6.6.1
+PyQt6-Qt6==6.6.3
+PyQt6-sip==13.13.1

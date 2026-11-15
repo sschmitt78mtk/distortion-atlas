@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+exports/
+.pytest_cache/
+qtshim/gschemas.compiled

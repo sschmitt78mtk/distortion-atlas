@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GLib schema shim for Qt 6.6 on this desktop.
+
+  gnome-settings-daemon moved the font keys (`antialiasing`, `hinting`,
+  `rgba-order`) into `org.gnome.settings-daemon.plugins.xsettings.deprecated`,
+  but Qt 6.6 still reads them from the old schema id, and GLib aborts the process
+  when a key is missing:
+
+      GLib-GIO-ERROR: Settings schema
+      'org.gnome.settings-daemon.plugins.xsettings' does not contain a key
+      named 'antialiasing'
+
+  This file re-declares the old id with the six keys Qt expects. Point GLib at
+  the compiled directory to start any Qt 6.6 application on such a desktop:
+
+      glib-compile-schemas qtshim
+      GSETTINGS_SCHEMA_DIR=qtshim python3 main.py
+
+  Remove it again once PyQt6 >= 6.7 is installed; nothing in visiontest depends
+  on it.
+-->
+<schemalist>
+  <enum id="visiontest.GsdFontAntialiasingMode">
+    <value nick="none" value="0"/>
+    <value nick="grayscale" value="1"/>
+    <value nick="rgba" value="2"/>
+  </enum>
+  <enum id="visiontest.GsdFontHinting">
+    <value nick="none" value="0"/>
+    <value nick="slight" value="1"/>
+    <value nick="medium" value="2"/>
+    <value nick="full" value="3"/>
+  </enum>
+  <enum id="visiontest.GsdFontRgbaOrder">
+    <value nick="rgb" value="0"/>
+    <value nick="bgr" value="1"/>
+    <value nick="vrgb" value="2"/>
+    <value nick="vbgr" value="3"/>
+  </enum>
+  <schema id="org.gnome.settings-daemon.plugins.xsettings" path="/org/gnome/settings-daemon/plugins/xsettings/">
+    <key name="disabled-gtk-modules" type="as">
+      <default>[]</default>
+      <summary>List of explicitly disabled GTK+ modules</summary>
+      <description>Compatibility copy of the GNOME key.</description>
+    </key>
+    <key name="enabled-gtk-modules" type="as">
+      <default>[]</default>
+      <summary>List of explicitly enabled GTK+ modules</summary>
+      <description>Compatibility copy of the GNOME key.</description>
+    </key>
+    <key type="a{sv}" name="overrides">
+      <default>{}</default>
+      <summary>A dictionary of XSETTINGS to override</summary>
+      <description>Compatibility copy of the GNOME key.</description>
+    </key>
+    <key name="antialiasing" enum="visiontest.GsdFontAntialiasingMode">
+      <default>'grayscale'</default>
+      <summary>Antialiasing</summary>
+      <description>Compatibility copy of the GNOME key.</description>
+    </key>
+    <key name="hinting" enum="visiontest.GsdFontHinting">
+      <default>'slight'</default>
+      <summary>Hinting</summary>
+      <description>Compatibility copy of the GNOME key.</description>
+    </key>
+    <key name="rgba-order" enum="visiontest.GsdFontRgbaOrder">
+      <default>'rgb'</default>
+      <summary>RGBA order</summary>
+      <description>Compatibility copy of the GNOME key.</description>
+    </key>
+  </schema>
+</schemalist>
