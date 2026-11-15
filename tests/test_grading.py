@@ -2,7 +2,7 @@
 
 import unittest
 
-from visiontest.ui import Session
+from distortion_atlas.ui import Session
 
 SIDE = 400
 

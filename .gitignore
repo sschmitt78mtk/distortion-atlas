@@ -3,4 +3,7 @@ __pycache__/
 .venv/
 exports/
 .pytest_cache/
-qtshim/gschemas.compiled
+dist/
+build/
+*.egg-info/
+distortion_atlas/qtshim/gschemas.compiled

@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from visiontest.patterns.targets import (
+from distortion_atlas.patterns.targets import (
     block_average,
     checkerboard,
     mean_code_value,

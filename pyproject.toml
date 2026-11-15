@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "distortion-atlas"
+dynamic = ["version"]
+description = "A self-administered visual-distortion atlas for a high-PPI panel."
+readme = "README.md"
+requires-python = ">=3.12"
+keywords = [
+    "metamorphopsia",
+    "amsler-grid",
+    "visual-field",
+    "vision-testing",
+    "psychophysics",
+    "pyqt6",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "numpy>=1.26.4",
+    "Pillow>=10.2.0",
+    "PyQt6>=6.6.1,<6.7",
+]
+
+[project.scripts]
+distortion-atlas = "distortion_atlas.ui:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "distortion_atlas.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["distortion_atlas*"]
+
+[tool.setuptools.package-data]
+distortion_atlas = ["qtshim/*.xml"]

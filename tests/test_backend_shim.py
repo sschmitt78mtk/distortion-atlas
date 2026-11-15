@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from visiontest.backends import qt
+from distortion_atlas.backends import qt
 
 
 class SchemaShimTest(unittest.TestCase):
@@ -50,7 +50,7 @@ class SchemaShimTest(unittest.TestCase):
     def test_a_missing_compiled_file_is_built_on_demand(self):
         done = subprocess.CompletedProcess(args=[], returncode=0)
         with mock.patch(
-            "visiontest.backends.qt.subprocess.run", return_value=done
+            "distortion_atlas.backends.qt.subprocess.run", return_value=done
         ) as run, mock.patch.object(
             qt, "_schema_key_present", side_effect=[False, True]
         ):
@@ -59,7 +59,7 @@ class SchemaShimTest(unittest.TestCase):
 
     def test_a_failed_compile_is_reported_instead_of_crashing(self):
         with mock.patch(
-            "visiontest.backends.qt.subprocess.run",
+            "distortion_atlas.backends.qt.subprocess.run",
             side_effect=OSError("glib-compile-schemas missing"),
         ), mock.patch.object(qt, "_schema_key_present", return_value=False):
             self.assertEqual(qt.ensure_gnome_schema(), "unavailable")
@@ -73,7 +73,7 @@ class SchemaShimTest(unittest.TestCase):
         with mock.patch.object(
             qt, "_schema_key_present", return_value=True
         ), mock.patch(
-            "visiontest.backends.qt.subprocess.run",
+            "distortion_atlas.backends.qt.subprocess.run",
             side_effect=OSError("no gsettings"),
         ):
             self.assertEqual(qt.ensure_gnome_schema(), "ok")

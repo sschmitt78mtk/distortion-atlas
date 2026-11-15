@@ -14,25 +14,25 @@
   This file re-declares the old id with the six keys Qt expects. Point GLib at
   the compiled directory to start any Qt 6.6 application on such a desktop:
 
-      glib-compile-schemas qtshim
-      GSETTINGS_SCHEMA_DIR=qtshim python3 main.py
+      glib-compile-schemas distortion_atlas/qtshim
+      GSETTINGS_SCHEMA_DIR=distortion_atlas/qtshim python3 main.py
 
-  Remove it again once PyQt6 >= 6.7 is installed; nothing in visiontest depends
+  Remove it again once PyQt6 >= 6.7 is installed; nothing in distortion-atlas depends
   on it.
 -->
 <schemalist>
-  <enum id="visiontest.GsdFontAntialiasingMode">
+  <enum id="distortion_atlas.GsdFontAntialiasingMode">
     <value nick="none" value="0"/>
     <value nick="grayscale" value="1"/>
     <value nick="rgba" value="2"/>
   </enum>
-  <enum id="visiontest.GsdFontHinting">
+  <enum id="distortion_atlas.GsdFontHinting">
     <value nick="none" value="0"/>
     <value nick="slight" value="1"/>
     <value nick="medium" value="2"/>
     <value nick="full" value="3"/>
   </enum>
-  <enum id="visiontest.GsdFontRgbaOrder">
+  <enum id="distortion_atlas.GsdFontRgbaOrder">
     <value nick="rgb" value="0"/>
     <value nick="bgr" value="1"/>
     <value nick="vrgb" value="2"/>
@@ -54,17 +54,17 @@
       <summary>A dictionary of XSETTINGS to override</summary>
       <description>Compatibility copy of the GNOME key.</description>
     </key>
-    <key name="antialiasing" enum="visiontest.GsdFontAntialiasingMode">
+    <key name="antialiasing" enum="distortion_atlas.GsdFontAntialiasingMode">
       <default>'grayscale'</default>
       <summary>Antialiasing</summary>
       <description>Compatibility copy of the GNOME key.</description>
     </key>
-    <key name="hinting" enum="visiontest.GsdFontHinting">
+    <key name="hinting" enum="distortion_atlas.GsdFontHinting">
       <default>'slight'</default>
       <summary>Hinting</summary>
       <description>Compatibility copy of the GNOME key.</description>
     </key>
-    <key name="rgba-order" enum="visiontest.GsdFontRgbaOrder">
+    <key name="rgba-order" enum="distortion_atlas.GsdFontRgbaOrder">
       <default>'rgb'</default>
       <summary>RGBA order</summary>
       <description>Compatibility copy of the GNOME key.</description>

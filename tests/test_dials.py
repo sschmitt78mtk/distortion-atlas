@@ -6,8 +6,8 @@ import unittest
 
 import numpy as np
 
-from visiontest.patterns import BLACK, WHITE, spoke_mask
-from visiontest.patterns.dials import (
+from distortion_atlas.patterns import BLACK, WHITE, spoke_mask
+from distortion_atlas.patterns.dials import (
     CROSSED_RATIO,
     SPOKE_WIDTH_PX,
     angle_step_deg,

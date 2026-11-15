@@ -10,8 +10,8 @@ import numpy as np
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from visiontest import export, keybar  # noqa: E402
-from visiontest.ui import OVERLAY_HEIGHT_PX, Session, check_pixel_path  # noqa: E402
+from distortion_atlas import export, keybar  # noqa: E402
+from distortion_atlas.ui import OVERLAY_HEIGHT_PX, Session, check_pixel_path  # noqa: E402
 
 try:  # pragma: no cover - the skip branch only runs without PyQt6
     from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
@@ -19,7 +19,7 @@ try:  # pragma: no cover - the skip branch only runs without PyQt6
     from PyQt6.QtTest import QTest
     from PyQt6.QtWidgets import QApplication
 
-    from visiontest.backends.qt import (
+    from distortion_atlas.backends.qt import (
         QtPresenter,
         configure_scaling,
         create_application,

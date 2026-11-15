@@ -54,7 +54,7 @@ Coordinates are computed as `x - cx` with integer offsets, and grid lines use a 
 
 ### D4 — Distance and calibration are one mutable `Scale` object
 
-`Scale` holds `px_per_mm`, `source` (`calibrated` | `panel_derived`), `distance_mm`, and exposes `deg_per_px`, `arcmin_per_px`, `px_for_degrees`, `field_for_px`. Every readout and every export reads from it, so a distance change is a single mutation. Calibration is stored in `~/.config/visiontest/config.json` (stdlib `json`, no new dependency) with a plausibility check at ±25 % against the panel-derived value, as required by `visual-angle-geometry`.
+`Scale` holds `px_per_mm`, `source` (`calibrated` | `panel_derived`), `distance_mm`, and exposes `deg_per_px`, `arcmin_per_px`, `px_for_degrees`, `field_for_px`. Every readout and every export reads from it, so a distance change is a single mutation. Calibration is stored in `~/.config/distortion-atlas/config.json` (stdlib `json`, no new dependency) with a plausibility check at ±25 % against the panel-derived value, as required by `visual-angle-geometry`.
 
 ### D5 — Event-driven redraw with a latency budget
 

@@ -1,9 +1,11 @@
 """Persistence of the pixels-per-millimetre calibration.
 
-The stored value lives in ``$XDG_CONFIG_HOME/visiontest/config.json`` (stdlib
-``json`` only, no new dependency). Without it the pitch is derived from the
-reported panel size and labelled ``panel_derived`` everywhere, because an
-uncalibrated pitch gives plausible but wrong angular sizes.
+The stored value lives in ``$XDG_CONFIG_HOME/distortion-atlas/config.json``
+(stdlib ``json`` only, no new dependency). A value stored under the pre-rename
+``visiontest`` directory is still read, and the next save writes the new path.
+Without a usable value the pitch is derived from the reported panel size and
+labelled ``panel_derived`` everywhere, because an uncalibrated pitch gives
+plausible but wrong angular sizes.
 
 A measurement that differs from the panel-derived pitch by more than 25 % is
 refused unless it is explicitly confirmed — that is the guard from the
@@ -20,7 +22,8 @@ from pathlib import Path
 
 from .geometry import Scale
 
-CONFIG_DIR_NAME = "visiontest"
+CONFIG_DIR_NAME = "distortion-atlas"
+LEGACY_CONFIG_DIR_NAME = "visiontest"
 CONFIG_FILE_NAME = "config.json"
 
 #: Anything further than this from the panel-derived pitch needs confirmation.
@@ -76,11 +79,20 @@ class Calibration:
         }
 
 
+def _config_root() -> Path:
+    """``$XDG_CONFIG_HOME`` or ``~/.config``."""
+    base = os.environ.get("XDG_CONFIG_HOME")
+    return Path(base) if base else Path.home() / ".config"
+
+
 def config_path() -> Path:
     """Location of the stored calibration, honouring ``XDG_CONFIG_HOME``."""
-    base = os.environ.get("XDG_CONFIG_HOME")
-    root = Path(base) if base else Path.home() / ".config"
-    return root / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+    return _config_root() / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+
+
+def legacy_config_path() -> Path:
+    """Pre-rename calibration location; read for migration, never written."""
+    return _config_root() / LEGACY_CONFIG_DIR_NAME / CONFIG_FILE_NAME
 
 
 def panel_derived_px_per_mm(
@@ -124,9 +136,8 @@ def is_plausible(
     return abs(px_per_mm - reference) / reference <= tolerance
 
 
-def load_calibration(path: Path | None = None) -> Calibration | None:
-    """Read the stored calibration, or ``None`` when there is no usable value."""
-    target = Path(path) if path is not None else config_path()
+def _read_calibration(target: Path) -> Calibration | None:
+    """Parse one calibration file, or ``None`` when it is missing or unusable."""
     try:
         data = json.loads(target.read_text(encoding="utf-8"))
         px_per_mm = float(data["px_per_mm"])
@@ -139,6 +150,13 @@ def load_calibration(path: Path | None = None) -> Calibration | None:
         source=str(data.get("source") or "calibrated"),
         stored_at=data.get("stored_at"),
     )
+
+
+def load_calibration(path: Path | None = None) -> Calibration | None:
+    """Read the stored calibration, falling back to the pre-rename location."""
+    if path is not None:
+        return _read_calibration(Path(path))
+    return _read_calibration(config_path()) or _read_calibration(legacy_config_path())
 
 
 def save_calibration(

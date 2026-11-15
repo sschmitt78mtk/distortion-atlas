@@ -9,7 +9,7 @@ full key map.
 
 import sys
 
-from visiontest.ui import main
+from distortion_atlas.ui import main
 
 if __name__ == "__main__":
     sys.exit(main())

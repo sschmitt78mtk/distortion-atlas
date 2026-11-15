@@ -17,9 +17,9 @@ from unittest import mock
 import numpy as np
 from PIL import Image
 
-from visiontest import calibration
-from visiontest.params import CONTROLS, FAMILIES
-from visiontest.ui import OVERLAY_HEIGHT_PX, Session
+from distortion_atlas import calibration
+from distortion_atlas.params import CONTROLS, FAMILIES
+from distortion_atlas.ui import OVERLAY_HEIGHT_PX, Session
 
 DISTANCES = (300, 400, 500, 600)
 SIDE = 1080
@@ -193,7 +193,7 @@ class ExportIntegrationTest(unittest.TestCase):
         self.assertEqual(grade["eye"], "left")
         self.assertEqual(grade["grade"], 6)
         self.assertIn("dot_pitch", grade["geometry"])
-        self.assertEqual(result.png_path.name, "visiontest-20260708-091011.png")
+        self.assertEqual(result.png_path.name, "distortion-atlas-20260708-091011.png")
 
 
 if __name__ == "__main__":

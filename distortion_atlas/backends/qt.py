@@ -2,7 +2,7 @@
 
 Qt is already installed, runs natively on Wayland (no XWayland resampling) and
 lets the scaling policy be forced before the window exists. The presenter owns
-no pattern logic: it shows the buffer a :class:`~visiontest.ui.Session` renders
+no pattern logic: it shows the buffer a :class:`~distortion_atlas.ui.Session` renders
 and forwards key names, which is what keeps the renderers testable headlessly.
 """
 
@@ -50,8 +50,15 @@ XSETTINGS_PROBE_KEY = "antialiasing"
 
 
 def schema_shim_dir() -> Path:
-    """Directory holding the checked-in GLib schema shim."""
-    return Path(__file__).resolve().parents[2] / "qtshim"
+    """Directory holding the packaged GLib schema shim.
+
+    ``DISTORTION_ATLAS_SCHEMA_DIR`` overrides it for systems where the installed
+    package directory is not writable when the shim has to be compiled on demand.
+    """
+    override = os.environ.get("DISTORTION_ATLAS_SCHEMA_DIR")
+    if override:
+        return Path(override)
+    return Path(__file__).resolve().parents[1] / "qtshim"
 
 
 def _schema_key_present(key: str = XSETTINGS_PROBE_KEY) -> bool:
@@ -122,7 +129,8 @@ def create_application():
     if status == "shimmed":
         print(
             "note: GLib schema shim applied for Qt 6.6 "
-            "(GSETTINGS_SCHEMA_DIR=qtshim); see README troubleshooting",
+            f"(GSETTINGS_SCHEMA_DIR={schema_shim_dir()}); "
+            "see README troubleshooting",
             file=sys.stderr,
         )
     elif status == "unavailable":
@@ -146,7 +154,7 @@ def create_application():
     )
     if attribute is not None:
         QGuiApplication.setAttribute(attribute, True)
-    return QApplication(["visiontest"])
+    return QApplication(["distortion-atlas"])
 
 
 def _special_keys() -> dict:
@@ -219,7 +227,7 @@ class _ViewerWindow:
                 self._hover_key = None
                 self._repeat_button = None
                 self._repeat_coarse = False
-                self.setWindowTitle("visiontest")
+                self.setWindowTitle("distortion-atlas")
                 self.setMouseTracking(True)
                 self.setCursor(Qt.CursorShape.BlankCursor)
 

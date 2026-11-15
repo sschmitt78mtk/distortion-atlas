@@ -2,10 +2,10 @@
 
 ## 1. Key bar layout model
 
-- [x] 1.1 Add `visiontest/keybar.py` with `BarButton`, a caption map keyed by
+- [x] 1.1 Add `distortion_atlas/keybar.py` with `BarButton`, a caption map keyed by
   `Control.action`, `build(width, height, state)` laying out the four fixed rows
   and `hit_test(...)`; no Qt imports. Verify: `python3 -c "import
-  visiontest.keybar"` works with no display and `python3 -m unittest
+  distortion_atlas.keybar"` works with no display and `python3 -m unittest
   tests.test_keybar -v` passes.
 - [x] 1.2 Expand the grade control into ten digit buttons and fold the quit
   control's `q` / `Esc` keys into one button whose hint reads `q / Esc`. Verify:

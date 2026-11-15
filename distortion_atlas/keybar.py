@@ -3,7 +3,7 @@
 No GUI toolkit is imported here (design D3): the bar is described as plain
 rectangles, captions and key hints, so the layout can be verified headless and
 the Qt backend only paints what this module returns. One button exists per key
-string in :data:`visiontest.params.CONTROL_BY_KEY`, except the quit control
+string in :data:`distortion_atlas.params.CONTROL_BY_KEY`, except the quit control
 whose ``q`` and ``Esc`` share one button.
 
 The layout is deliberately arithmetic only - equal-width slots per row, no font
@@ -59,7 +59,7 @@ ROW_ACTIONS: tuple[tuple[str, ...], ...] = (
     ("overlay", "fixation", "export", "fullscreen", "reset", "quit"),
 )
 
-#: Short captions keyed by :attr:`visiontest.params.Control.action`.
+#: Short captions keyed by :attr:`distortion_atlas.params.Control.action`.
 CAPTIONS: dict[str, str] = {
     "family_amsler": "amsler",
     "family_lines": "lines",
@@ -205,7 +205,7 @@ def _row_buttons(actions: tuple[str, ...], controls: dict[str, Control]) -> list
 def build(width: int, height: int, state: dict | None = None) -> KeyBar:
     """Lay the bar out for a ``width`` x ``height`` widget.
 
-    ``state`` is the snapshot from :meth:`visiontest.ui.Session.key_bar_state`;
+    ``state`` is the snapshot from :meth:`distortion_atlas.ui.Session.key_bar_state`;
     missing keys fall back to a neutral state.
     """
     state = dict(state or {})

@@ -5,8 +5,8 @@ import unittest
 
 import numpy as np
 
-from visiontest.patterns import BLACK, WHITE
-from visiontest.patterns.grids import (
+from distortion_atlas.patterns import BLACK, WHITE
+from distortion_atlas.patterns.grids import (
     DOT_PX,
     PAIRINGS,
     PAIRING_NAMES,

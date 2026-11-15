@@ -6,7 +6,7 @@ There is no tool in this repo — and no convenient tool at all — for finding 
 
 ## What Changes
 
-- New Python application (`main.py` + `visiontest/` package) that renders distortion test patterns directly to a fullscreen window — displayed live, not merely saved.
+- New Python application (`main.py` + `distortion_atlas/` package) that renders distortion test patterns directly to a fullscreen window — displayed live, not merely saved.
 - Interactive keyboard control of the *reference geometry* (grid pitch, spoke count, source size, ghost offset), line contrast, viewing distance and the eye under test, with an immediate re-render.
 - A permanent, toggleable central fixation mark (dot / hollow ring) that anchors the gaze for every pattern.
 - Subjective **grading** of the perceived distortion (0–9 per item, M-chart style) so a session produces a score, not just an image.
@@ -30,7 +30,7 @@ Out of scope for this change: acuity measurement and scoring protocols, field/sc
 
 ## Impact
 
-- New files: `main.py`, `visiontest/` (geometry, calibration, params, patterns, fixation, ui, backends/qt, export), `tests/`.
+- New files: `main.py`, `distortion_atlas/` (geometry, calibration, params, patterns, fixation, ui, backends/qt, export), `tests/`.
 - New runtime dependency: PyQt6 (already installed on this machine; used for a native-Wayland, pixel-exact `QImage` blit) plus numpy (already installed) and Pillow for export.
 - Repository is otherwise greenfield: no existing code, APIs or specs are modified.
 - Environment assumption recorded by the tool: Linux/Wayland desktop, single monitor, display scaling disabled (asserted at runtime rather than trusted).

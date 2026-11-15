@@ -1,7 +1,7 @@
 """Session state, key dispatch and the presentable frame.
 
 Nothing here imports a GUI toolkit. A :class:`Session` owns the parameters, the
-scale, the grades and the buffers; a backend (see :mod:`visiontest.backends.qt`)
+scale, the grades and the buffers; a backend (see :mod:`distortion_atlas.backends.qt`)
 only hands buffers to the screen and forwards key strings. That split is what
 lets the viewer be tested under ``QT_QPA_PLATFORM=offscreen`` and keeps the
 exported buffer free of the readout overlay by construction (design D6).
@@ -30,11 +30,7 @@ OVERLAY_BACKGROUND = (16, 16, 16)
 OVERLAY_TEXT_COLOUR = (235, 235, 235)
 
 #: Shown before any pattern is displayed, and repeated in every record.
-STARTUP_NOTICE = (
-    "visiontest supports observation of visual distortion. It is not a medical "
-    "device and its output is not a diagnosis. All current patterns are static; "
-    "any future flashing content would carry a photosensitivity risk."
-)
+STARTUP_NOTICE = f"{export.DISCLAIMER} {export.PHOTOSENSITIVITY_WARNING}"
 
 MONOCULAR_REMINDER = "cover the other eye"
 
@@ -498,7 +494,7 @@ def _describe_hold(hold) -> str:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="visiontest",
+        prog="distortion-atlas",
         description=(
             "A self-administered distortion atlas: live test patterns with "
             "visual-angle geometry, grading and session export. "

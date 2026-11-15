@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from visiontest.fixation import (
+from distortion_atlas.fixation import (
     DEFAULT_COLOUR,
     DEFAULT_KIND,
     DEFAULT_SIZE_PX,
@@ -16,7 +16,7 @@ from visiontest.fixation import (
     fixation_mask,
     snap_size,
 )
-from visiontest.patterns import BLACK, GREY, WHITE, anchor, blank
+from distortion_atlas.patterns import BLACK, GREY, WHITE, anchor, blank
 
 SIDE = 120
 

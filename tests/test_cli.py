@@ -3,7 +3,7 @@
 import argparse
 import unittest
 
-from visiontest import ui
+from distortion_atlas import ui
 
 
 class HoldArgumentTest(unittest.TestCase):

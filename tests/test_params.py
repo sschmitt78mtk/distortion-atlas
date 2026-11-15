@@ -1,9 +1,9 @@
-"""Tests for :mod:`visiontest.params` — control map, steps, defaults (task 4.1)."""
+"""Tests for :mod:`distortion_atlas.params` — control map, steps, defaults (task 4.1)."""
 
 import collections
 import unittest
 
-from visiontest.params import (
+from distortion_atlas.params import (
     CONTROLS,
     CONTROL_BY_KEY,
     FAMILIES,
@@ -266,7 +266,7 @@ class FamilyAndResetTest(unittest.TestCase):
             Params(ghost_direction="sideways")
 
     def test_grade_round_trips_through_a_dict(self):
-        from visiontest.params import Grade
+        from distortion_atlas.params import Grade
 
         grade = Grade(
             family="lines",

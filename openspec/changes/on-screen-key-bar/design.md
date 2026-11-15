@@ -5,7 +5,7 @@
 See `proposal.md` - Why. The constraints that shape this design come from the
 current code:
 
-- `visiontest/ui.py` is toolkit-free. A `Session` owns parameters, grades,
+- `distortion_atlas/ui.py` is toolkit-free. A `Session` owns parameters, grades,
   buffers and the display-flag `fullscreen`; the backend only hands buffers to
   the screen and forwards key strings.
 - `Session.presented()` returns a copy of the rendered buffer whose top
@@ -66,7 +66,7 @@ buffer only in the top strip.
 
 ### D3 - A pure layout module, four fixed rows, equal slots
 
-New `visiontest/keybar.py`, no Qt imports: `BarButton` (action, key, caption,
+New `distortion_atlas/keybar.py`, no Qt imports: `BarButton` (action, key, caption,
 hint, rectangle, active, repeatable), a caption map keyed by `Control.action`,
 `build(width, height, state)` and `hit_test(...)`.
 

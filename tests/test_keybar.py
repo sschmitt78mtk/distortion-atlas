@@ -2,8 +2,8 @@
 
 import unittest
 
-from visiontest import keybar
-from visiontest.params import CONTROLS, CONTROL_BY_KEY
+from distortion_atlas import keybar
+from distortion_atlas.params import CONTROLS, CONTROL_BY_KEY
 
 STATE = {
     "family": "amsler",

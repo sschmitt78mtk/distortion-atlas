@@ -1,4 +1,4 @@
-"""Tests for :mod:`visiontest.calibration` — always against a temporary config."""
+"""Tests for :mod:`distortion_atlas.calibration` — always against a temporary config."""
 
 import json
 import os
@@ -7,8 +7,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from visiontest import calibration
-from visiontest.calibration import (
+from distortion_atlas import calibration
+from distortion_atlas.calibration import (
     ImplausibleCalibration,
     default_scale,
     is_plausible,
@@ -28,10 +28,19 @@ class CalibrationTest(unittest.TestCase):
         )
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.path = self.config_home / "visiontest" / "config.json"
+        self.path = self.config_home / "distortion-atlas" / "config.json"
 
     def test_config_path_follows_xdg_config_home(self):
         self.assertEqual(calibration.config_path(), self.path)
+
+    def test_a_pre_rename_calibration_is_still_read(self):
+        legacy = self.config_home / "visiontest" / "config.json"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(json.dumps({"px_per_mm": 5.4}), encoding="utf-8")
+        loaded = load_calibration()
+        self.assertIsNotNone(loaded)
+        self.assertAlmostEqual(loaded.px_per_mm, 5.4)
+        self.assertEqual(calibration.legacy_config_path(), legacy)
 
     def test_missing_file_yields_no_calibration_and_the_derived_fallback(self):
         self.assertIsNone(load_calibration())

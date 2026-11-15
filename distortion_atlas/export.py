@@ -16,12 +16,14 @@ from pathlib import Path
 
 from PIL import Image
 
-TOOL_NAME = "visiontest"
-TOOL_VERSION = "0.1.0"
+from . import __version__
+
+TOOL_NAME = "distortion-atlas"
+TOOL_VERSION = __version__
 
 DISCLAIMER = (
-    "visiontest supports observation of visual distortion. It is not a medical "
-    "device and its output is not a diagnosis."
+    "distortion-atlas supports observation of visual distortion. It is not a "
+    "medical device and its output is not a diagnosis."
 )
 NON_DIAGNOSTIC = "Not a medical device — this record is an observation aid only."
 PHOTOSENSITIVITY_WARNING = (

@@ -2,12 +2,12 @@
 
 ## Why
 
-The viewer is keyboard-only. `visiontest/params.py` maps 26 controls onto 36 key
+The viewer is keyboard-only. `distortion_atlas/params.py` maps 26 controls onto 36 key
 strings, the fullscreen window hides the cursor, and nothing on screen says which
 key does what. Observers lose the less obvious chords (`Shift+Tab`, `Ctrl`-arrow
 coarse steps, `[`/`]` distance, `m`/`w`/`x`/`h`/`s`/`f`/`r`/`q`), and a pointer
 user cannot drive a session at all — there is no mouse handling anywhere in
-`visiontest/backends/qt.py`.
+`distortion_atlas/backends/qt.py`.
 
 The obvious fix — a permanent toolbar — would cost about 11 % of a 1080p screen
 along the bottom edge of an Amsler field, which is exactly where peripheral
@@ -56,9 +56,9 @@ deltas merge when the two changes are archived.
 
 ## Impact
 
-- **Code**: new toolkit-free `visiontest/keybar.py` (layout, captions,
+- **Code**: new toolkit-free `distortion_atlas/keybar.py` (layout, captions,
   hit-testing); `Session` gains key-bar visibility state and a state snapshot;
-  `visiontest/backends/qt.py` gains mouse tracking, bar painting, hover, click
+  `distortion_atlas/backends/qt.py` gains mouse tracking, bar painting, hover, click
   dispatch, repeat and idle timers; `README.md` gains a pointer-controls
   paragraph.
 - **Tests**: new `tests/test_keybar.py` (pure layout and hit-testing) and new

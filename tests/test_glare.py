@@ -5,8 +5,8 @@ import unittest
 
 import numpy as np
 
-from visiontest.patterns import BLACK, WHITE, anchor, disc_mask
-from visiontest.patterns.glare import (
+from distortion_atlas.patterns import BLACK, WHITE, anchor, disc_mask
+from distortion_atlas.patterns.glare import (
     GHOST_DIRECTIONS,
     GHOST_LINE_PX,
     ghost_edge_position,

@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from visiontest import export
-from visiontest.ui import Session
+from distortion_atlas import export
+from distortion_atlas.ui import Session
 
 SIDE = 200
 
@@ -67,8 +67,8 @@ class ExportTest(SessionFixture):
         self.assertTrue(result.ok, result.message())
         self.assertTrue(result.png_path.exists())
         self.assertTrue(result.json_path.exists())
-        self.assertEqual(result.png_path.name, "visiontest-20261115-134512.png")
-        self.assertEqual(result.json_path.name, "visiontest-20261115-134512.json")
+        self.assertEqual(result.png_path.name, "distortion-atlas-20261115-134512.png")
+        self.assertEqual(result.json_path.name, "distortion-atlas-20261115-134512.json")
 
         with Image.open(result.png_path) as image:
             self.assertEqual(image.size, (SIDE, SIDE))
@@ -85,7 +85,7 @@ class ExportTest(SessionFixture):
         result = self.session.export(timestamp=datetime(2026, 1, 2, 3, 4, 5))
         record = json.loads(result.json_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(record["tool"]["name"], "visiontest")
+        self.assertEqual(record["tool"]["name"], "distortion-atlas")
         self.assertEqual(record["scale"]["source"], "panel_derived")
         self.assertAlmostEqual(record["scale"]["distance_mm"], 400.0)
         self.assertEqual(record["context"]["eye"], "left")

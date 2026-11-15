@@ -1,8 +1,8 @@
-"""Tests for :mod:`visiontest.geometry`."""
+"""Tests for :mod:`distortion_atlas.geometry`."""
 
 import unittest
 
-from visiontest.geometry import (
+from distortion_atlas.geometry import (
     DEFAULT_MARGIN_PX,
     Scale,
     fit_field,
