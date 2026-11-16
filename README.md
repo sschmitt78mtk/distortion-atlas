@@ -209,6 +209,14 @@ pixel-path result, the non-diagnostic statement and, after a scotoma run, the
 `blindspot` block with its presentation `variant` and `blink_ms`. A write failure
 is reported with the attempted path and leaves the session usable.
 
+![Standard scotoma results export: black field with the dot lattice, green rings
+for seen positions and red rings with filled centres for the blind cluster](exports-sample/distortion-atlas-20261116-220616.png)
+
+*A standard scotoma export: 130 seen, 45 blind, 1094 untested, inner ring 24/24
+seen, 400 mm, 1.52′/px (uncalibrated). The readout strip is not part of the
+exported buffer; the matching JSON with the per-position records sits next to the
+PNG in `exports-sample/`.*
+
 ## Tests
 
 ```bash
