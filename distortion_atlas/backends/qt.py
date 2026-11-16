@@ -436,7 +436,8 @@ class _ViewerWindow:
                     return
                 test = outer.session.scotoma
                 if test is not None and not test.finished:
-                    # A click is a response only while a dot is lit; the bar is inert.
+                    # A click is a response only while a presentation is open;
+                    # the bar stays inert for the whole window.
                     if test.lit:
                         self._dispatch("Space")
                     return

@@ -128,6 +128,14 @@ class ViewerTest(unittest.TestCase):
         self.presenter.dispatch("q")
         self.assertFalse(self.presenter.widget._stimulus_timer.isActive())
 
+    def test_the_inverse_run_starts_on_i_and_uses_the_same_timer(self):
+        result = self.presenter.dispatch("i")
+        self.assertEqual(result.action, "blindspot_started")
+        self.assertEqual(self.session.scotoma.settings.variant, "inverse")
+        self.assertTrue(self.presenter.widget._stimulus_timer.isActive())
+        self.presenter.dispatch("q")
+        self.assertFalse(self.presenter.widget._stimulus_timer.isActive())
+
     def test_a_left_click_responds_while_a_dot_is_lit(self):
         from PyQt6.QtTest import QTest
 
@@ -464,6 +472,7 @@ class KeyMappingTest(unittest.TestCase):
 
     def test_letters_digits_and_esc_keep_their_names(self):
         self.assertEqual(key_name(self._event(Qt.Key.Key_A, text="a")), "a")
+        self.assertEqual(key_name(self._event(Qt.Key.Key_I, text="i")), "i")
         self.assertEqual(key_name(self._event(Qt.Key.Key_5, text="5")), "5")
         self.assertEqual(key_name(self._event(Qt.Key.Key_Escape)), "Esc")
         self.assertEqual(key_name(self._event(Qt.Key.Key_Backtab)), "Shift+Tab")

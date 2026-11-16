@@ -10,7 +10,9 @@ exports as PNG + JSON.
 
 **distortion-atlas supports observation of visual distortion. It is not a medical
 device and its output is not a diagnosis.** The scotoma test presents flashing
-dots and therefore carries a photosensitivity risk; the static patterns do not.
+content — a lit dot on black, or a bright field whose probed dark dot blinks at
+1 Hz — and therefore carries a photosensitivity and bright-field discomfort
+risk; the static patterns do not.
 
 **AI-generated note:** everything in this repository is AI-generated — the code
 and tests as well as the OpenSpec artifacts under `openspec/` (proposals,
@@ -107,6 +109,7 @@ and applies it itself, so no environment variable is required (see
 | `h` | readout overlay on/off |
 | `x` | fixation mark on/off |
 | `b` | start a scotoma (blind-spot) test on the dot lattice |
+| `i` | start the inverse scotoma variant: black dots on a bright field, probed dot blinking |
 | `s` | export PNG + JSON |
 | `f` | fullscreen / windowed |
 | `r` | reset the active family's parameters (keeps distance, eye, correction, ambient) |
@@ -131,8 +134,9 @@ input is required or handled.
 
 Press `b` while any pattern is displayed to replace it with a dot-by-dot
 detection session on a rectangular lattice aligned to the current lines pattern.
-The session eye, correction, viewing distance and pixel-path result are carried
-into the test unchanged, and the fixation mark is forced on.
+`i` starts the inverse variant described below; `b` keeps the standard lit-dot
+variant. The session eye, correction, viewing distance and pixel-path result are
+carried into the test unchanged, and the fixation mark is forced on.
 
 - **Trial plan.** All 24 positions of the inner 5x5 ring around fixation are
   tested (the exact centre is skipped because the fixation mark sits there),
@@ -142,7 +146,8 @@ into the test unchanged, and the fixation mark is forced on.
   dot stays at a faint contrast on black. After a random 500-3000 ms gap the
   next dot appears. The lattice itself does not flash between trials, but the
   random single-dot sequence still carries a photosensitivity risk; the results
-  frame repeats that warning.
+  frame repeats that warning. The inverse variant follows the same schedule and
+  additionally blinks its probed dot every 500 ms.
 - **Response.** `Space` (or a left click) inside the window marks the position
   seen, ends the presentation immediately and records the latency. A press with
   no dot lit is counted as a late or anticipatory response and is not attributed
@@ -162,14 +167,29 @@ into the test unchanged, and the fixation mark is forced on.
   or fewer inner-ring dots seen is marked **not interpretable** instead of being
   read as a scotoma map.
 - **Export.** Press `s` on the results frame to write the results PNG plus a JSON
-  record with a `blindspot` block (settings, seed, lattice, context, every
-  position with its attempts, summary counts and clusters). Export is refused
-  while the run is active. `b` restarts with a new seed.
+  record with a `blindspot` block (variant, settings, seed, lattice, context,
+  every position with its attempts, summary counts and clusters). Export is
+  refused while the run is active. `b` restarts the standard variant with a new
+  seed and `i` restarts the inverse one.
+- **Inverse variant (`i`).** Same trial plan, timing, retries, neighbour probing,
+  pause, results summary and export structure; only the presentation and the
+  record's identity fields differ. The field is full-contrast black dots on a
+  bright background. The probed dot blinks with a 500 ms half-period: it is
+  absent at onset, present 500 ms later and absent again 500 ms later, so at any
+  instant at most one dot differs from the rest of the lattice and the whole
+  lattice is present outside the window. The centre position is never probed;
+  its black dot stays marked by the red fixation ring, which the inverse field
+  enlarges until it clears the dot by a background gap so the centre stays
+  findable on the bright field. The live readout and results frame are
+  labelled `INVERSE`, and the record carries `blindspot.variant` plus
+  `blindspot.settings.blink_ms` (0 for the standard variant).
 
 **Safety.** Test one eye at a time and cover the other: with both eyes open the
 fellow eye fills in a scotoma. The mode is an observation aid, not perimetry and
-not a diagnosis, and it should not replace an examination. Stop immediately if
-the flashing dots cause discomfort.
+not a diagnosis, and it should not replace an examination. The inverse variant
+fills the screen with white, which glares more than the dark field, and blinks
+one small dark dot at 1 Hz; stop immediately if the bright field or the blink
+causes discomfort.
 
 ## What gets exported
 
@@ -180,10 +200,14 @@ pattern itself. The only on-screen pixels that differ from the exported image ar
 the readout strip and, while the bar is revealed, the bottom band it covers.
 The JSON record contains the
 pattern parameters, every scale value with its `calibrated`/`panel_derived`
-source, the eye, correction state, ambient note, viewing distance, all grades
+source, the eye, correction state, ambient note, viewing distance, the fixation
+setting with the size actually drawn (`fixation.size_px` and
+`fixation.effective_size_px`, which differ while an inverse scotoma run sizes
+its ring to clear the centre dot), all grades
 (with regrade counts), display-limited contrast flags, the panel identity, the
-pixel-path result and the non-diagnostic statement. A write failure is reported
-with the attempted path and leaves the session usable.
+pixel-path result, the non-diagnostic statement and, after a scotoma run, the
+`blindspot` block with its presentation `variant` and `blink_ms`. A write failure
+is reported with the attempted path and leaves the session usable.
 
 ## Tests
 

@@ -26,6 +26,19 @@ def snap_size(size_px: int) -> int:
     return value if value % 2 else max(3, value - 1)
 
 
+def size_for_dot(dot_size_px: int, gap_px: int = 2) -> int:
+    """Smallest odd ring size whose inner edge clears a dot, leaving ``gap_px``.
+
+    The inverse scotoma field draws a black dot on the fixation anchor. At the
+    default ring size the mark would sit on top of that dot and be hard to find
+    on the bright field, so the field raises its size until a background gap
+    separates the red circle from the dot.
+    """
+    half = max(1, int(dot_size_px)) // 2
+    gap = max(0, int(gap_px))
+    return snap_size(2 * (half + gap + RING_THICKNESS_PX) + 1)
+
+
 def fixation_mask(
     width: int,
     height: int,
@@ -63,18 +76,30 @@ def draw_fixation(
     return frame
 
 
-def apply_fixation(buffer: np.ndarray, params) -> np.ndarray:
-    """Paint the mark the parameters ask for, or leave the frame untouched."""
+def apply_fixation(
+    buffer: np.ndarray, params, min_size_px: int = 0
+) -> np.ndarray:
+    """Paint the mark the parameters ask for, or leave the frame untouched.
+
+    ``min_size_px`` raises the ring size without changing the recorded
+    parameters: the inverse scotoma field uses it so the red circle clears its
+    black centre dot instead of being buried in it. Filled marks are never
+    enlarged, because they are already visible against any field.
+    """
     if not getattr(params, "fixation_visible", True):
         return buffer.copy()
     height, width = buffer.shape[:2]
     cx, cy = anchor(width, height)
+    kind = getattr(params, "fixation_kind", DEFAULT_KIND)
+    size_px = int(getattr(params, "fixation_px", DEFAULT_SIZE_PX))
+    if min_size_px and kind == "ring":
+        size_px = max(size_px, int(min_size_px))
     return draw_fixation(
         buffer,
         cx,
         cy,
-        kind=getattr(params, "fixation_kind", DEFAULT_KIND),
-        size_px=getattr(params, "fixation_px", DEFAULT_SIZE_PX),
+        kind=kind,
+        size_px=size_px,
         colour=DEFAULT_COLOUR,
     )
 

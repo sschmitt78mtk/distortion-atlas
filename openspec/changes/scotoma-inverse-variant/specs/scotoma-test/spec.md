@@ -4,7 +4,7 @@
 
 ### Requirement: Inverse presentation variant
 
-The mode SHALL offer an inverse presentation variant that draws black lattice dots on a bright background and indicates the probed position by omitting its dot for the response window, while preserving the standard variant's trial plan, timing, retry and probing rules, results summary and export structure.
+The mode SHALL offer an inverse presentation variant that draws black lattice dots on a bright background and indicates the probed position by alternating its dot between absent and present at a fixed half-period for the response window, while preserving the standard variant's trial plan, timing, retry and probing rules, results summary and export structure. The centre dot SHALL remain present and SHALL be marked by a red fixation ring that clears it with background pixels.
 
 #### Scenario: Inverse field starts on i
 
@@ -13,18 +13,31 @@ The mode SHALL offer an inverse presentation variant that draws black lattice do
 - **AND** the fixation mark is visible
 - **AND** no dot is omitted before the first presentation
 
-#### Scenario: Probed dot disappears
+#### Scenario: Centre stays identifiable
+
+- **WHEN** the inverse test field is shown
+- **THEN** the black lattice dot at the fixation anchor is present
+- **AND** the red fixation ring leaves a background gap around that dot
+- **AND** the ring is no smaller than the observer's fixation size
+
+#### Scenario: Probed dot blinks
 
 - **WHEN** an inverse presentation is open
-- **THEN** exactly one lattice dot is absent
-- **AND** every other lattice dot remains visible
-- **AND** the absent dot returns when the presentation window closes
+- **THEN** the probed dot starts absent at onset
+- **AND** it alternates between absent and present every 500 ms for the rest of the window
+- **AND** at any instant at most one lattice dot differs from the rest of the lattice
+- **AND** every lattice dot is present once the presentation window closes
+
+#### Scenario: Blink does not change the trial plan
+
+- **WHEN** an inverse run is compared with a standard run of the same seed and geometry
+- **THEN** both queues, presentation windows, gaps, retries and neighbour probes are identical
 
 #### Scenario: Standard variant is preserved
 
 - **WHEN** the observer presses `b`
 - **THEN** the test field shows a dim lattice on black
-- **AND** the probed position is a dot at full contrast
+- **AND** the probed position is a dot at full contrast for the whole window
 
 ## MODIFIED Requirements
 
@@ -69,7 +82,7 @@ The viewer SHALL offer a scotoma test mode with standard and inverse presentatio
 
 ### Requirement: Presentation timing and response
 
-Exactly one position SHALL be in its presentation window at a time for the whole 1500 ms response window. The probed position SHALL be a lit dot in the standard variant and an omitted dot in the inverse variant. The gap SHALL be sampled uniformly from 500–3000 ms. A `Space` response inside the window SHALL mark the position seen, end the presentation and record latency; expiry SHALL mark a miss. Responses outside an open window SHALL NOT be attributed to any position.
+Exactly one position SHALL be in its presentation window at a time for the whole 1500 ms response window. The probed position SHALL be a lit dot in the standard variant and a dot that blinks between absent and present with a 500 ms half-period in the inverse variant. The blink SHALL NOT reset, extend or shorten the response window. The gap SHALL be sampled uniformly from 500–3000 ms. A `Space` response inside the window SHALL mark the position seen, end the presentation and record latency; expiry SHALL mark a miss. Responses outside an open window SHALL NOT be attributed to any position.
 
 #### Scenario: Dot seen
 
@@ -78,12 +91,18 @@ Exactly one position SHALL be in its presentation window at a time for the whole
 - **AND** the dot goes dark immediately
 - **AND** a latency of 400 ms is recorded for that attempt
 
-#### Scenario: Omitted dot detected
+#### Scenario: Blinking dot detected
 
-- **WHEN** the observer presses `Space` 400 ms after a dot disappears in the inverse variant
+- **WHEN** the observer presses `Space` 400 ms after the probed dot first disappears in the inverse variant
 - **THEN** that position is marked seen
-- **AND** the dot returns immediately
+- **AND** every lattice dot is present immediately
 - **AND** a latency of 400 ms is recorded for that attempt
+
+#### Scenario: Blink stops with the window
+
+- **WHEN** an inverse presentation window closes
+- **THEN** the probed dot is present for the whole following gap
+- **AND** the attempt is recorded exactly as in the standard variant
 
 #### Scenario: Dot missed
 
@@ -120,7 +139,7 @@ Exactly one position SHALL be in its presentation window at a time for the whole
 
 ### Requirement: Live presentation frame
 
-The test field SHALL show the fixation mark and the lattice throughout. In the standard variant the lattice SHALL be dim on black with the probed dot lit at full contrast; in the inverse variant the lattice SHALL be black on a bright background with the probed dot omitted. The status overlay strip SHALL NOT be shown while a presentation is open. The fixation mark SHALL remain visible throughout.
+The test field SHALL show the fixation mark and the lattice throughout. In the standard variant the lattice SHALL be dim on black with the probed dot lit at full contrast; in the inverse variant the lattice SHALL be black on a bright background with the probed dot blinking between absent and present. The status overlay strip SHALL NOT be shown while a presentation is open. The fixation mark SHALL remain visible throughout.
 
 #### Scenario: Overlay suppressed during a presentation
 
@@ -147,7 +166,8 @@ The test field SHALL show the fixation mark and the lattice throughout. In the s
 
 - **WHEN** the inverse variant is running
 - **THEN** the field is black dots on a bright background
-- **AND** an open presentation omits exactly one dot
+- **AND** an open presentation starts with exactly one dot omitted
+- **AND** that dot returns and disappears once more before the window closes
 
 ### Requirement: Results frame
 
@@ -169,11 +189,11 @@ When the test ends the mode SHALL display a results frame that identifies the pr
 
 - **WHEN** an inverse run ends
 - **THEN** the results frame identifies the inverse variant
-- **AND** it carries the inverse variant's photosensitivity warning
+- **AND** it carries the inverse variant's warning that names the bright field and the blinking dark dot
 
 ### Requirement: Record contents
 
-The record SHALL contain the presentation variant, the mode settings and seed, the session context, the lattice geometry, every position with its verdict and attempts, the summary counts and clusters, the existing scale and pixel-path context, and the safety statements.
+The record SHALL contain the presentation variant, its blink half-period, the mode settings and seed, the session context, the lattice geometry, every position with its verdict and attempts, the summary counts and clusters, the existing scale and pixel-path context, and the safety statements.
 
 #### Scenario: Attempts are preserved
 
@@ -189,7 +209,8 @@ The record SHALL contain the presentation variant, the mode settings and seed, t
 
 - **WHEN** an inverse run is recorded
 - **THEN** the `blindspot` block states that the variant is inverse
-- **AND** a standard run states that the variant is standard
+- **AND** it records the 500 ms blink half-period
+- **AND** a standard run states that the variant is standard and records no blink
 
 ### Requirement: Mode key precedence and key bar
 
@@ -225,8 +246,14 @@ Every scotoma-test record and results frame SHALL carry a photosensitivity warni
 #### Scenario: Inverse record carries the warning
 
 - **WHEN** an inverse scotoma-test record is written
-- **THEN** it contains a photosensitivity warning that mentions the bright field and disappearing dark dots
+- **THEN** it contains a photosensitivity warning that mentions the bright field and the blinking dark dot
 - **AND** it contains the non-diagnostic statement
+
+#### Scenario: Startup notice names both variants
+
+- **WHEN** the application starts before a variant has been chosen
+- **THEN** the startup notice warns about the standard lit dot and the inverse bright field with its blinking dark dot
+- **AND** it carries the non-diagnostic disclaimer
 
 #### Scenario: Results frame carries the statement
 

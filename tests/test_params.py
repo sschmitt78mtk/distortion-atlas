@@ -50,6 +50,7 @@ class ControlMapTest(unittest.TestCase):
             "overlay",
             "fixation",
             "blindspot",
+            "blindspot_inverse",
             "export",
             "fullscreen",
             "reset",
@@ -65,6 +66,10 @@ class ControlMapTest(unittest.TestCase):
     def test_quit_is_reachable_on_two_keys(self):
         self.assertEqual(lookup("q").action, "quit")
         self.assertEqual(lookup("Esc").action, "quit")
+
+    def test_the_inverse_variant_is_reachable_on_i(self):
+        self.assertEqual(lookup("i").action, "blindspot_inverse")
+        self.assertIsNone(apply_control(Params(), "i"))
 
     def test_unmapped_key_is_ignored(self):
         self.assertIsNone(lookup("z"))

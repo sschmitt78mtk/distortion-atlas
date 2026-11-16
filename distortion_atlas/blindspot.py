@@ -10,6 +10,11 @@ inner 5x5 positions except the centre are tested first, then a seeded random
 sample of the rest of the field. A missed position is retried once; a second
 miss marks it blind and queues its eight neighbours, so a confirmed blind region
 is mapped outward until the surround is seen (design D2/D4).
+
+Both presentation variants share this state machine: the standard variant lights
+one dot on a dark field, while the inverse variant draws dark dots on a bright
+field and blinks the probed dot between absent and present at a fixed
+half-period (design D1/D2/D7).
 """
 
 from __future__ import annotations
@@ -39,6 +44,18 @@ SEEN_OUTCOME = "seen"
 MISS_OUTCOME = "miss"
 ABORTED_OUTCOME = "aborted"
 
+#: Presentation variants: a lit dot on black, or dark dots on a bright field
+#: with the probed dot blinking away (design D1/D2).
+STANDARD = "standard"
+INVERSE = "inverse"
+VARIANT_NAMES: tuple[str, ...] = (STANDARD, INVERSE)
+
+#: Half-period of the inverse variant's blink, in milliseconds (design D7).
+INVERSE_BLINK_MS = 500
+
+#: Shortest allowed blink half-period, so the stimulus cannot become a strobe.
+MIN_BLINK_MS = 100
+
 
 @dataclass(frozen=True)
 class BlindSpotSettings:
@@ -55,6 +72,8 @@ class BlindSpotSettings:
     trial_cap: int = 400
     deadline_ms: int = 1_200_000
     seed: int | None = None
+    variant: str = STANDARD
+    blink_ms: int = 0
 
     def __post_init__(self) -> None:
         if int(self.window_ms) < 1:
@@ -78,6 +97,19 @@ class BlindSpotSettings:
             raise ValueError(f"trial_cap must be positive, got {self.trial_cap!r}")
         if int(self.deadline_ms) < 1:
             raise ValueError(f"deadline_ms must be positive, got {self.deadline_ms!r}")
+        if self.variant not in VARIANT_NAMES:
+            raise ValueError(
+                f"variant must be one of {VARIANT_NAMES}, got {self.variant!r}"
+            )
+        if int(self.blink_ms) < 0:
+            raise ValueError(f"blink_ms must not be negative, got {self.blink_ms!r}")
+        if int(self.blink_ms) and not (
+            MIN_BLINK_MS <= int(self.blink_ms) <= int(self.window_ms) // 2
+        ):
+            raise ValueError(
+                f"blink_ms must be 0 or between {MIN_BLINK_MS} and "
+                f"{int(self.window_ms) // 2}, got {self.blink_ms!r}"
+            )
 
 
 @dataclass
@@ -240,6 +272,9 @@ class BlindSpotTest:
         self.onset_ms: int | None = None
         self.window_end_ms: int | None = None
         self.gap_end_ms: int | None = None
+        #: Whether the probe signal is on screen: a lit dot in the standard
+        #: variant, an erased dot in the inverse variant.
+        self.probe_shown = False
         self.started_at_ms: int | None = None
         self.stopped_at_ms: int | None = None
         self.presentations = 0
@@ -292,7 +327,7 @@ class BlindSpotTest:
 
     @property
     def lit(self) -> bool:
-        """Whether a dot is currently lit and its window is open."""
+        """Whether a presentation is open (the probe is in its window)."""
         return self.state == "active" and self.current is not None
 
     @property
@@ -347,6 +382,10 @@ class BlindSpotTest:
                 continue
             if self.state == "active":
                 if now < float(self.window_end_ms or 0.0):
+                    shown = self._probe_shown(now)
+                    if shown != self.probe_shown:
+                        self.probe_shown = shown
+                        changed = True
                     break
                 self._record_miss(now)
                 changed = True
@@ -365,12 +404,28 @@ class BlindSpotTest:
         self.window_end_ms = now + float(self.settings.window_ms)
         self.presentations += 1
         self.state = "active"
+        self.probe_shown = self._probe_shown(now)
+
+    def _probe_shown(self, now_ms: float) -> bool:
+        """Whether the probe signal is on screen at ``now_ms`` (design D7).
+
+        The phase is anchored at the presentation onset, so every presentation
+        of a position blinks identically and the sampler's jitter cannot shift
+        the pattern. The signal starts on at onset — the erased dot's
+        disappearance is the onset transient — so an even phase keeps it on.
+        """
+        blink = int(self.settings.blink_ms)
+        if not blink or self.onset_ms is None:
+            return True
+        phase = int((float(now_ms) - float(self.onset_ms)) // blink)
+        return phase % 2 == 0
 
     def _clear_presentation(self) -> None:
         self.current = None
         self.current_entry = None
         self.onset_ms = None
         self.window_end_ms = None
+        self.probe_shown = False
 
     def _record_miss(self, now: float) -> None:
         position = self.current
@@ -640,6 +695,7 @@ class BlindSpotTest:
         """The ``blindspot`` block of the exported JSON record."""
         settings = self.settings
         return {
+            "variant": settings.variant,
             "settings": {
                 "window_ms": int(settings.window_ms),
                 "gap_ms": [int(settings.gap[0]), int(settings.gap[1])],
@@ -652,6 +708,7 @@ class BlindSpotTest:
                 "probe_offset": int(settings.probe_offset),
                 "trial_cap": int(settings.trial_cap),
                 "deadline_ms": int(settings.deadline_ms),
+                "blink_ms": int(settings.blink_ms),
             },
             "seed": int(self.seed),
             "lattice": self.lattice.as_dict(),

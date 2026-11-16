@@ -20,6 +20,12 @@ LATTICE_CONTRAST = 12.0
 LATTICE_COLOUR: Colour = blend(BLACK, WHITE, LATTICE_CONTRAST / 100.0)
 LIT_COLOUR: Colour = WHITE
 
+#: Inverse palette: full-contrast black dots on a bright field (design D2).
+BACKGROUND_COLOUR: Colour = BLACK
+INVERSE_BACKGROUND_COLOUR: Colour = WHITE
+INVERSE_LATTICE_COLOUR: Colour = BLACK
+INVERSE_LIT_COLOUR: Colour = INVERSE_BACKGROUND_COLOUR
+
 #: Results-frame ring colours (design D8).
 SEEN_COLOUR: Colour = (0, 192, 0)
 BLIND_COLOUR: Colour = RED
@@ -192,6 +198,21 @@ def text_width(text: str, scale: int = 1) -> int:
     return len(str(text)) * (GLYPH_WIDTH + GLYPH_GAP) * scale
 
 
+def palette(settings=None) -> tuple[Colour, Colour, Colour]:
+    """``(background, lattice, target)`` colours for the settings' variant.
+
+    In the inverse variant the target is drawn in the background colour, which
+    erases the lattice dot instead of lighting it (design D2).
+    """
+    if getattr(settings, "variant", "standard") == "inverse":
+        return (
+            INVERSE_BACKGROUND_COLOUR,
+            INVERSE_LATTICE_COLOUR,
+            INVERSE_LIT_COLOUR,
+        )
+    return BACKGROUND_COLOUR, LATTICE_COLOUR, LIT_COLOUR
+
+
 def render_lattice(
     params,
     width: int,
@@ -199,11 +220,12 @@ def render_lattice(
     positions,
     settings=None,
 ) -> np.ndarray:
-    """The faint dot lattice on black; the caller applies the fixation mark."""
-    frame = blank(width, height, BLACK)
+    """The dot lattice on the variant's background; the caller adds fixation."""
+    background, lattice_colour, _ = palette(settings)
+    frame = blank(width, height, background)
     size = dot_size(settings)
     for position in positions:
-        _draw_dot(frame, position.x_px, position.y_px, size, LATTICE_COLOUR)
+        _draw_dot(frame, position.x_px, position.y_px, size, lattice_colour)
     return frame
 
 
@@ -215,7 +237,12 @@ def render_test_frame(
     lit=None,
     settings=None,
 ) -> np.ndarray:
-    """The lattice with exactly one position at full contrast, all others dim."""
+    """The lattice with the probed position in the target colour.
+
+    Standard: one dot at full contrast. Inverse: the probed dot is erased with
+    the background colour.
+    """
+    _, _, target_colour = palette(settings)
     frame = render_lattice(params, width, height, positions, settings=settings)
     if lit is None:
         return frame
@@ -224,13 +251,15 @@ def render_test_frame(
         x, y = lit
     else:
         y = lit.y_px
-    _draw_dot(frame, int(x), int(y), dot_size(settings), LIT_COLOUR)
+    _draw_dot(frame, int(x), int(y), dot_size(settings), target_colour)
     return frame
 
 
-def _caption_lines(summary: dict) -> list[tuple[str, int]]:
+def _caption_lines(summary: dict, variant: str = "standard") -> list[tuple[str, int]]:
     """The results-frame caption, as ``(text, font scale)`` pairs."""
     lines: list[tuple[str, int]] = []
+    if variant == "inverse":
+        lines.append(("INVERSE - DARK DOTS ON BRIGHT FIELD", 2))
     if not summary.get("interpretable", True):
         lines.append(("NOT INTERPRETABLE - TOO FEW INNER-RING DOTS SEEN", 2))
     lines.append(
@@ -273,7 +302,12 @@ def _caption_lines(summary: dict) -> list[tuple[str, int]]:
         )
     if len(clusters) > MAX_CLUSTER_LINES:
         lines.append((f"AND {len(clusters) - MAX_CLUSTER_LINES} MORE CLUSTERS", 1))
-    lines.append(("PHOTOSENSITIVITY: RANDOM FLASHING DOTS - STOP IF UNCOMFORTABLE", 1))
+    warning = (
+        "PHOTOSENSITIVITY: ONE BLINKING DARK DOT - STOP IF UNCOMFORTABLE"
+        if variant == "inverse"
+        else "PHOTOSENSITIVITY: RANDOM FLASHING DOTS - STOP IF UNCOMFORTABLE"
+    )
+    lines.append((warning, 1))
     lines.append(("NOT A MEDICAL DIAGNOSIS - OBSERVATION AID ONLY", 1))
     return lines
 
@@ -294,6 +328,7 @@ def render_results_frame(
     """
     frame = blank(width, height, BLACK)
     radius = ring_radius(lattice, settings)
+    variant = getattr(settings, "variant", "standard")
     blind_dot = max(2, dot_size(settings) // 2)
     for position in positions:
         verdict = position.verdict
@@ -308,7 +343,7 @@ def render_results_frame(
             _draw_dot(frame, position.x_px, position.y_px, blind_dot, BLIND_COLOUR)
 
     pen_y = CAPTION_MARGIN_PX
-    for text, scale in _caption_lines(summary):
+    for text, scale in _caption_lines(summary, variant):
         draw_text(
             frame,
             CAPTION_MARGIN_PX,

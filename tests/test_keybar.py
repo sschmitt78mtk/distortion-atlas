@@ -14,7 +14,7 @@ STATE = {
     "grade": None,
 }
 
-ROW_COUNTS = (7, 10, 12, 7)
+ROW_COUNTS = (7, 10, 12, 8)
 
 
 def rows(bar):
@@ -34,7 +34,7 @@ class ButtonSetTest(unittest.TestCase):
         expected = set(CONTROL_BY_KEY) - {"Esc"}  # Esc shares the quit button
         self.assertEqual(set(keys), expected)
         self.assertEqual(len(keys), len(set(keys)), "a key owns two buttons")
-        self.assertEqual(len(self.bar.buttons), 36)
+        self.assertEqual(len(self.bar.buttons), 37)
 
     def test_the_digits_each_own_one_button(self):
         for digit in "0123456789":
@@ -52,6 +52,17 @@ class ButtonSetTest(unittest.TestCase):
         self.assertEqual(buttons[0].key, "b")
         self.assertEqual(buttons[0].caption, "scotoma test")
         self.assertEqual(buttons[0].hint, "b")
+
+    def test_the_inverse_control_owns_i(self):
+        buttons = [
+            button
+            for button in self.bar.buttons
+            if button.action == "blindspot_inverse"
+        ]
+        self.assertEqual(len(buttons), 1)
+        self.assertEqual(buttons[0].key, "i")
+        self.assertEqual(buttons[0].caption, "inverse")
+        self.assertEqual(buttons[0].hint, "i")
 
     def test_the_quit_control_folds_both_keys_into_one_button(self):
         quit_buttons = [b for b in self.bar.buttons if b.action == "quit"]

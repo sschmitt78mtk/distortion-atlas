@@ -10,8 +10,10 @@ from unittest import mock
 import numpy as np
 from PIL import Image
 
-from distortion_atlas import export, ui
+from distortion_atlas import blindspot, export, ui
 from distortion_atlas.blindspot import BlindSpotSettings
+from distortion_atlas.fixation import fixation_mask, size_for_dot
+from distortion_atlas.patterns import anchor
 from distortion_atlas.ui import OVERLAY_HEIGHT_PX, Session
 
 SIDE = 416
@@ -83,6 +85,91 @@ class StartTest(SessionFixture):
         self.assertFalse(test.lit)
         self.assertEqual(int(np.all(self.session.buffer == 255, axis=2).sum()), 0)
 
+    def test_b_keeps_the_standard_variant(self):
+        result = self.session.handle_key("b")
+        self.assertEqual(result.action, "blindspot_started")
+        test = self.session.scotoma
+        self.assertEqual(test.settings.variant, blindspot.STANDARD)
+        self.assertEqual(test.settings.blink_ms, 0)
+        self.assertIn("appears", result.message)
+        self.assertEqual(tuple(self.session.buffer[0, 0]), (0, 0, 0))
+
+    def test_i_starts_the_inverse_variant_on_a_bright_field(self):
+        result = self.session.handle_key("i")
+        self.assertEqual(result.action, "blindspot_started")
+        test = self.session.scotoma
+        self.assertEqual(test.settings.variant, blindspot.INVERSE)
+        self.assertEqual(test.settings.blink_ms, blindspot.INVERSE_BLINK_MS)
+        self.assertIn("blinks", result.message)
+        self.assertEqual(tuple(self.session.buffer[0, 0]), (255, 255, 255))
+        self.assertIn("INVERSE", self.session.overlay_text())
+
+    def test_i_restarts_a_finished_inverse_run_with_the_same_variant(self):
+        first = self.session.handle_key("i")
+        self.assertEqual(first.action, "blindspot_started")
+        finished = self.session.scotoma
+        self.session.handle_key("q")
+        self.clock.now_ms = 5000
+        result = self.session.handle_key("i")
+        self.assertEqual(result.action, "blindspot_started")
+        self.assertIsNot(self.session.scotoma, finished)
+        self.assertEqual(self.session.scotoma.settings.variant, blindspot.INVERSE)
+        self.assertIn("i restarts", self.session.handle_key("q").message)
+
+
+class InverseFixationTest(SessionFixture):
+    """The centre dot must stay identifiable on the bright inverse field."""
+
+    def start_inverse(self):
+        self.session.params.dot_pitch = 50
+        self.clock.now_ms = 0.0
+        self.session.handle_key("i")
+        return self.session.scotoma
+
+    def red_mask(self):
+        frame = self.session.buffer
+        return (frame[:, :, 0] > 150) & (frame[:, :, 1] < 80) & (frame[:, :, 2] < 80)
+
+    def test_i_clears_the_black_centre_dot_with_the_red_ring(self):
+        test = self.start_inverse()
+        cx, cy = anchor(SIDE, SIDE)
+        self.assertEqual(tuple(self.session.buffer[cy, cx]), (0, 0, 0))
+        red = self.red_mask()
+        self.assertFalse(bool(red[cy - 4 : cy + 4, cx - 4 : cx + 4].any()))
+        for step in (7, 8):
+            self.assertTrue(red[cy - step, cx])
+            self.assertTrue(red[cy + step, cx])
+            self.assertTrue(red[cy, cx - step])
+            self.assertTrue(red[cy, cx + step])
+        expected = fixation_mask(
+            SIDE, SIDE, cx, cy, "ring", size_for_dot(test.settings.dot_px)
+        )
+        self.assertTrue(np.array_equal(red, expected))
+
+    def test_b_keeps_the_parameter_sized_fixation(self):
+        self.session.params.dot_pitch = 50
+        self.session.handle_key("b")
+        cx, cy = anchor(SIDE, SIDE)
+        expected = fixation_mask(
+            SIDE, SIDE, cx, cy, "ring", self.session.params.fixation_px
+        )
+        self.assertTrue(np.array_equal(self.red_mask(), expected))
+
+    def test_a_larger_user_ring_is_not_shrunk(self):
+        self.session.params.fixation_px = 25
+        self.start_inverse()
+        cx, cy = anchor(SIDE, SIDE)
+        expected = fixation_mask(SIDE, SIDE, cx, cy, "ring", 25)
+        self.assertTrue(np.array_equal(self.red_mask(), expected))
+
+    def test_the_results_frame_keeps_the_clearing_ring(self):
+        self.start_inverse()
+        self.session.handle_key("q")
+        cx, cy = anchor(SIDE, SIDE)
+        self.assertFalse(
+            bool(self.red_mask()[cy - 4 : cy + 4, cx - 4 : cx + 4].any())
+        )
+
 
 class FinishTest(SessionFixture):
     def test_q_finishes_with_a_results_frame_and_keeps_running(self):
@@ -120,6 +207,14 @@ class FinishTest(SessionFixture):
         self.assertEqual(result.action, "blindspot_started")
         self.assertIsNot(self.session.scotoma, first)
         self.assertFalse(self.session.scotoma.finished)
+
+    def test_inverse_results_are_labelled_and_name_the_blink(self):
+        self.session.handle_key("i")
+        self.session.handle_key("q")
+        text = self.session.overlay_text()
+        self.assertIn("INVERSE", text)
+        self.assertIn("one blinking dark dot", text)
+        self.assertIn("i restart", text)
 
 
 class PauseTest(SessionFixture):
@@ -166,7 +261,7 @@ class IgnoredKeysTest(SessionFixture):
         before = self.session.params.to_dict()
         for key in (
             "Up", "Down", "Left", "Right", "1", "a", "l", "d", "h", "x",
-            "r", "m", "w", "[", "]",
+            "r", "m", "w", "[", "]", "i",
         ):
             with self.subTest(key=key):
                 result = self.session.handle_key(key)
@@ -214,6 +309,64 @@ class HudTest(SessionFixture):
         self.assertTrue(
             np.array_equal(lit[:OVERLAY_HEIGHT_PX], self.session.buffer[:OVERLAY_HEIGHT_PX])
         )
+
+
+class BlinkTest(SessionFixture):
+    def _inverse(self):
+        return self.start(
+            variant=blindspot.INVERSE, blink_ms=blindspot.INVERSE_BLINK_MS
+        )
+
+    def test_the_inverse_probe_alternates_between_absent_and_present(self):
+        test = self._inverse()
+        self.clock.now_ms = float(test.gap_end_ms)
+        self.assertTrue(self.session.tick_scotoma_test())
+        self.assertTrue(test.lit)
+        self.assertTrue(test.probe_shown)
+        probed = test.current
+        self.assertEqual(
+            tuple(self.session.buffer[probed.y_px, probed.x_px]), (255, 255, 255)
+        )
+
+        self.clock.now_ms = float(test.onset_ms) + 1
+        self.assertFalse(self.session.tick_scotoma_test())
+
+        self.clock.now_ms = float(test.onset_ms) + test.settings.blink_ms
+        self.assertTrue(self.session.tick_scotoma_test())
+        self.assertFalse(test.probe_shown)
+        self.assertEqual(
+            tuple(self.session.buffer[probed.y_px, probed.x_px]), (0, 0, 0)
+        )
+
+        self.clock.now_ms = float(test.onset_ms) + 2 * test.settings.blink_ms
+        self.assertTrue(self.session.tick_scotoma_test())
+        self.assertTrue(test.probe_shown)
+        self.assertEqual(
+            tuple(self.session.buffer[probed.y_px, probed.x_px]), (255, 255, 255)
+        )
+
+    def test_the_hud_stays_hidden_for_the_whole_blinking_window(self):
+        test = self._inverse()
+        self.session.params.overlay = True
+        self.clock.now_ms = float(test.gap_end_ms)
+        self.session.tick_scotoma_test()
+        for offset in (0, test.settings.blink_ms, 2 * test.settings.blink_ms):
+            self.clock.now_ms = float(test.onset_ms) + offset
+            self.session.tick_scotoma_test()
+            self.assertTrue(
+                np.array_equal(self.session.presented(), self.session.buffer)
+            )
+
+    def test_a_response_inside_the_blink_scores_the_position(self):
+        test = self._inverse()
+        self.clock.now_ms = float(test.gap_end_ms)
+        self.session.tick_scotoma_test()
+        probed = test.current
+        self.clock.now_ms = float(test.onset_ms) + 700
+        result = self.session.handle_key("Space")
+        self.assertTrue(result.changed)
+        self.assertEqual(probed.verdict, "seen")
+        self.assertIn("seen", result.message)
 
 
 class ExportTest(SessionFixture):
@@ -285,7 +438,21 @@ class SafetyTextTest(unittest.TestCase):
         self.assertIn("dot", warning)
         self.assertNotIn("all current patterns are static", warning)
         self.assertIn("not a medical device", export.NON_DIAGNOSTIC.lower())
-        self.assertIn(export.PHOTOSENSITIVITY_WARNING, ui.STARTUP_NOTICE)
+
+    def test_the_inverse_warning_names_the_bright_field_and_the_blink(self):
+        warning = export.INVERSE_PHOTOSENSITIVITY_WARNING.lower()
+        self.assertIn("bright field", warning)
+        self.assertIn("blink", warning)
+        self.assertIn("photosensitivity", warning)
+        self.assertIn("discomfort", warning)
+
+    def test_the_startup_notice_covers_both_variants(self):
+        self.assertIn(export.COMBINED_PHOTOSENSITIVITY_WARNING, ui.STARTUP_NOTICE)
+        notice = ui.STARTUP_NOTICE.lower()
+        self.assertIn("standard variant", notice)
+        self.assertIn("inverse variant", notice)
+        self.assertIn("bright field", notice)
+        self.assertIn(export.DISCLAIMER, ui.STARTUP_NOTICE)
 
 
 if __name__ == "__main__":

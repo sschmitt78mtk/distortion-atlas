@@ -1,3 +1,3 @@
 # scotoma-inverse-variant
 
-Second scotoma-test variant: black dots on a bright field with the probed dot disappearing.
+Second scotoma-test variant: black dots on a bright field whose probed dot blinks at 1 Hz.

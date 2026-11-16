@@ -14,6 +14,7 @@ from distortion_atlas.fixation import (
     covers_centre,
     draw_fixation,
     fixation_mask,
+    size_for_dot,
     snap_size,
 )
 from distortion_atlas.patterns import BLACK, GREY, WHITE, anchor, blank
@@ -80,6 +81,23 @@ class FixationMaskTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             fixation_mask(SIDE, SIDE, 60, 60, "cross", 11)
 
+    def test_a_ring_can_clear_a_centre_dot_with_a_background_gap(self):
+        cx, cy = anchor(SIDE, SIDE)
+        size = size_for_dot(8)
+        self.assertEqual(size, 17)
+        mask = fixation_mask(SIDE, SIDE, cx, cy, "ring", size)
+        self.assertFalse(bool(mask[cy - 4 : cy + 4, cx - 4 : cx + 4].any()))
+        for step in (7, 8):
+            self.assertTrue(mask[cy - step, cx])
+            self.assertTrue(mask[cy + step, cx])
+            self.assertTrue(mask[cy, cx - step])
+            self.assertTrue(mask[cy, cx + step])
+
+    def test_the_clearance_gap_sets_the_minimum_ring_size(self):
+        self.assertEqual(size_for_dot(8, 0), 13)
+        self.assertEqual(size_for_dot(1), 9)
+        self.assertEqual(size_for_dot(8) % 2, 1)
+
 
 class FixationDrawTest(unittest.TestCase):
     def test_drawing_touches_only_the_mark(self):
@@ -121,6 +139,32 @@ class FixationDrawTest(unittest.TestCase):
         frame_copy = frame.copy()
         draw_fixation(frame, *anchor(SIDE, SIDE))
         self.assertTrue(np.array_equal(frame, frame_copy))
+
+    def test_the_minimum_size_raises_only_the_ring(self):
+        frame = blank(SIDE, SIDE, GREY)
+        raised = apply_fixation(frame, fixation_params(), min_size_px=size_for_dot(8))
+        changed = np.any(raised != frame, axis=2)
+        expected = fixation_mask(
+            SIDE, SIDE, *anchor(SIDE, SIDE), "ring", size_for_dot(8)
+        )
+        self.assertTrue(np.array_equal(changed, expected))
+
+    def test_a_larger_user_size_is_not_shrunk_by_the_minimum(self):
+        frame = blank(SIDE, SIDE, GREY)
+        painted = apply_fixation(
+            frame, fixation_params(fixation_px=25), min_size_px=size_for_dot(8)
+        )
+        changed = np.any(painted != frame, axis=2)
+        expected = fixation_mask(SIDE, SIDE, *anchor(SIDE, SIDE), "ring", 25)
+        self.assertTrue(np.array_equal(changed, expected))
+
+    def test_the_minimum_never_enlarges_a_filled_mark(self):
+        frame = blank(SIDE, SIDE, GREY)
+        plain = apply_fixation(frame, fixation_params(fixation_kind="dot"))
+        raised = apply_fixation(
+            frame, fixation_params(fixation_kind="dot"), min_size_px=size_for_dot(8)
+        )
+        self.assertTrue(np.array_equal(plain, raised))
 
 
 if __name__ == "__main__":

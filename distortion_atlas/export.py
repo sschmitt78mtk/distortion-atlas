@@ -17,6 +17,7 @@ from pathlib import Path
 from PIL import Image
 
 from . import __version__
+from .fixation import size_for_dot, snap_size
 
 TOOL_NAME = "distortion-atlas"
 TOOL_VERSION = __version__
@@ -30,6 +31,19 @@ PHOTOSENSITIVITY_WARNING = (
     "The scotoma test presents flashing dots — one lit dot at a time in a random "
     "sequence — and therefore carries a photosensitivity risk. Stop if you feel "
     "discomfort."
+)
+
+INVERSE_PHOTOSENSITIVITY_WARNING = (
+    "The inverse scotoma test presents a bright field with dark dots and blinks "
+    "one dark dot at a time, so it carries a photosensitivity and bright-field "
+    "discomfort risk. Stop if you feel discomfort."
+)
+
+COMBINED_PHOTOSENSITIVITY_WARNING = (
+    "The scotoma test presents flashing content — a lit dot on a dark field in "
+    "the standard variant and a blinking dark dot on a bright field in the "
+    "inverse variant — and therefore carries a photosensitivity and bright-field "
+    "discomfort risk. Stop if you feel discomfort."
 )
 
 #: EDID of the target panel; read for the panel identity in the record.
@@ -171,13 +185,32 @@ def build_record(
     params = session.params
     check = getattr(session, "self_check", None)
     fit = getattr(session, "last_fit", None)
+    test = getattr(session, "scotoma", None)
+    variant = getattr(getattr(test, "settings", None), "variant", "standard")
+    warning = (
+        INVERSE_PHOTOSENSITIVITY_WARNING
+        if variant == "inverse"
+        else PHOTOSENSITIVITY_WARNING
+    )
+    # The inverse field raises the ring so it clears the black centre dot; the
+    # record keeps the parameter and states the size that was actually drawn.
+    effective_fixation_px = int(params.fixation_px)
+    if (
+        test is not None
+        and variant == "inverse"
+        and params.fixation_kind == "ring"
+    ):
+        effective_fixation_px = max(
+            effective_fixation_px, size_for_dot(test.settings.dot_px)
+        )
+    effective_fixation_px = snap_size(effective_fixation_px)
 
     record = {
         "tool": {"name": TOOL_NAME, "version": TOOL_VERSION},
         "generated_at": (timestamp or datetime.now()).isoformat(timespec="seconds"),
         "disclaimer": DISCLAIMER,
         "non_diagnostic": NON_DIAGNOSTIC,
-        "photosensitivity_warning": PHOTOSENSITIVITY_WARNING,
+        "photosensitivity_warning": warning,
         "panel": panel if panel is not None else panel_identity(),
         "display": {
             "buffer_px": [int(session.width), int(session.height)],
@@ -208,13 +241,13 @@ def build_record(
                 "visible": bool(params.fixation_visible),
                 "kind": params.fixation_kind,
                 "size_px": int(params.fixation_px),
+                "effective_size_px": effective_fixation_px,
             },
         },
         "contrast_limits": contrast_flags(params),
         "grades": [grade.to_dict() for grade in session.ordered_grades()],
         "overlay_text": session.overlay_text(),
     }
-    test = getattr(session, "scotoma", None)
     if test is not None:
         blindspot = test.record(session.scale)
         blindspot["context"] = {

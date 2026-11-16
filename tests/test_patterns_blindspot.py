@@ -161,5 +161,102 @@ class ResultsFrameTest(unittest.TestCase):
         self.assertEqual(cluster["extent_deg"], [round(spacing_deg, 1), 0.0])
 
 
+class InverseFrameTest(unittest.TestCase):
+    def _settings(self, **overrides):
+        options = {
+            "gap": GAP,
+            "seed": 1,
+            "outside_sample": 0,
+            "dot_px": 8,
+            "variant": blindspot.INVERSE,
+            "blink_ms": blindspot.INVERSE_BLINK_MS,
+        }
+        options.update(overrides)
+        return BlindSpotSettings(**options)
+
+    def test_the_inverse_field_is_black_dots_on_a_bright_background(self):
+        test = make_test()
+        settings = self._settings()
+        frame = renderer.render_lattice(
+            Params(), SIDE, SIDE, test.positions, settings=settings
+        )
+        self.assertEqual(tuple(frame[0, 0]), renderer.INVERSE_BACKGROUND_COLOUR)
+        self.assertEqual(tuple(frame[0, 0]), (255, 255, 255))
+        half = settings.dot_px // 2
+        for position in test.positions:
+            self.assertEqual(
+                tuple(frame[position.y_px - half, position.x_px - half]),
+                renderer.INVERSE_LATTICE_COLOUR,
+            )
+
+    def test_the_inverse_probe_erases_exactly_one_dot(self):
+        test = make_test()
+        settings = self._settings()
+        probed = test.position(1, 1)
+        half = settings.dot_px // 2
+        frame = renderer.render_test_frame(
+            Params(), SIDE, SIDE, test.positions, lit=probed, settings=settings
+        )
+        self.assertEqual(
+            tuple(frame[probed.y_px - half, probed.x_px - half]),
+            renderer.INVERSE_BACKGROUND_COLOUR,
+        )
+        base = renderer.render_test_frame(
+            Params(), SIDE, SIDE, test.positions, settings=settings
+        )
+        differing = np.argwhere(np.any(frame != base, axis=2))
+        self.assertEqual(len(differing), settings.dot_px ** 2)
+        for y, x in differing:
+            self.assertLessEqual(abs(int(y) - probed.y_px), half)
+            self.assertLessEqual(abs(int(x) - probed.x_px), half)
+
+    def test_the_standard_palette_is_unchanged(self):
+        test = make_test()
+        settings = BlindSpotSettings(gap=GAP, seed=1, outside_sample=0)
+        without_palette = renderer.render_lattice(
+            Params(), SIDE, SIDE, test.positions
+        )
+        standard = renderer.render_lattice(
+            Params(), SIDE, SIDE, test.positions, settings=settings
+        )
+        self.assertTrue(np.array_equal(without_palette, standard))
+        self.assertEqual(tuple(without_palette[0, 0]), BLACK)
+        probed = test.position(1, 1)
+        lit = renderer.render_test_frame(
+            Params(), SIDE, SIDE, test.positions, lit=probed, settings=settings
+        )
+        self.assertEqual(
+            tuple(lit[probed.y_px, probed.x_px]), renderer.LIT_COLOUR
+        )
+
+    def test_the_inverse_results_frame_is_labelled_and_warns(self):
+        test = make_test()
+        scale = Scale(px_per_mm=5.666, distance_mm=400)
+        summary = test.results(scale)
+        frame = renderer.render_results_frame(
+            Params(),
+            SIDE,
+            SIDE,
+            test.positions,
+            summary,
+            lattice=test.lattice,
+            settings=self._settings(),
+        )
+        self.assertEqual(tuple(frame[0, 0]), BLACK)
+        text = " | ".join(
+            line for line, _ in renderer._caption_lines(summary, "inverse")
+        )
+        self.assertIn("INVERSE", text)
+        self.assertIn("BLINKING DARK DOT", text)
+        self.assertIn("NOT A MEDICAL DIAGNOSIS", text)
+
+    def test_the_standard_caption_keeps_its_wording(self):
+        test = make_test()
+        summary = test.results(Scale(px_per_mm=5.666, distance_mm=400))
+        text = " | ".join(line for line, _ in renderer._caption_lines(summary))
+        self.assertNotIn("INVERSE", text)
+        self.assertIn("RANDOM FLASHING DOTS", text)
+
+
 if __name__ == "__main__":
     unittest.main()

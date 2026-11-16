@@ -9,8 +9,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from distortion_atlas import export
+from distortion_atlas import blindspot, export
 from distortion_atlas.blindspot import BlindSpotSettings
+from distortion_atlas.fixation import size_for_dot
 from distortion_atlas.ui import Session
 
 SIDE = 200
@@ -92,6 +93,13 @@ class ExportTest(SessionFixture):
         self.assertEqual(record["context"]["eye"], "left")
         self.assertEqual(record["context"]["correction"], "worn")
         self.assertEqual(record["context"]["ambient_note"], "dim room, evening")
+        self.assertEqual(
+            record["context"]["fixation"]["size_px"], self.session.params.fixation_px
+        )
+        self.assertEqual(
+            record["context"]["fixation"]["effective_size_px"],
+            self.session.params.fixation_px,
+        )
         self.assertEqual(record["display"]["buffer_px"], [SIDE, SIDE])
         self.assertFalse(record["display"]["overlay_exported"])
         self.assertEqual(len(record["grades"]), 2)
@@ -236,8 +244,50 @@ class BlindspotRecordTest(unittest.TestCase):
         ]
         self.assertEqual(attempts[0]["outcome"], "seen")
         self.assertEqual(attempts[0]["response_ms"], 300)
+        self.assertEqual(block["variant"], "standard")
+        self.assertEqual(block["settings"]["blink_ms"], 0)
+        self.assertEqual(
+            record["photosensitivity_warning"],
+            export.PHOTOSENSITIVITY_WARNING,
+        )
         self.assertIn("flashing", record["photosensitivity_warning"])
         self.assertIn("Not a medical device", record["non_diagnostic"])
+
+        with Image.open(result.png_path) as image:
+            exported = np.asarray(image)
+        self.assertTrue(np.array_equal(exported, session.buffer))
+
+    def test_an_inverse_run_records_the_variant_and_the_bright_field_warning(self):
+        session = Session(width=200, height=200, export_dir=self.dir)
+        session.params.dot_pitch = 20
+        session.start_scotoma_test(
+            Session.scotoma_settings(blindspot.INVERSE), now_ms=0
+        )
+        session.scotoma.stop(100)
+        session.render()
+
+        result = session.export(timestamp=datetime(2026, 1, 2, 3, 4, 5))
+        self.assertTrue(result.ok, result.message())
+        record = json.loads(result.json_path.read_text(encoding="utf-8"))
+        block = record["blindspot"]
+        self.assertEqual(block["variant"], "inverse")
+        self.assertEqual(block["settings"]["blink_ms"], 500)
+        self.assertEqual(
+            record["photosensitivity_warning"],
+            export.INVERSE_PHOTOSENSITIVITY_WARNING,
+        )
+        warning = record["photosensitivity_warning"].lower()
+        self.assertIn("bright field", warning)
+        self.assertIn("blink", warning)
+        self.assertIn("Not a medical device", record["non_diagnostic"])
+        fixation = record["context"]["fixation"]
+        self.assertEqual(fixation["size_px"], session.params.fixation_px)
+        self.assertEqual(
+            fixation["effective_size_px"],
+            size_for_dot(session.scotoma.settings.dot_px),
+        )
+        # The results frame stays dark even though the test field was bright.
+        self.assertEqual(tuple(session.buffer[0, 0]), (0, 0, 0))
 
         with Image.open(result.png_path) as image:
             exported = np.asarray(image)

@@ -388,5 +388,121 @@ class ResultsTest(unittest.TestCase):
         self.assertEqual(record["summary"]["central_seen"], "0/24")
 
 
+class VariantTest(unittest.TestCase):
+    def test_the_default_variant_is_standard_and_shows_a_steady_dot(self):
+        test = make_test()
+        self.assertEqual(test.settings.variant, blindspot.STANDARD)
+        self.assertEqual(test.settings.blink_ms, 0)
+        test.tick(1000)
+        self.assertTrue(test.lit)
+        self.assertTrue(test.probe_shown)
+        self.assertFalse(test.tick(1200))
+
+    def test_the_inverse_variant_is_accepted_and_recorded(self):
+        settings = BlindSpotSettings(
+            gap=GAP,
+            seed=1,
+            outside_sample=0,
+            variant=blindspot.INVERSE,
+            blink_ms=blindspot.INVERSE_BLINK_MS,
+        )
+        test = make_test(settings)
+        record = test.record(Scale(px_per_mm=5.666, distance_mm=400))
+        self.assertEqual(record["variant"], blindspot.INVERSE)
+        self.assertEqual(record["settings"]["blink_ms"], 500)
+
+    def test_a_standard_record_states_the_standard_variant(self):
+        record = make_test().record(Scale(px_per_mm=5.666, distance_mm=400))
+        self.assertEqual(record["variant"], blindspot.STANDARD)
+        self.assertEqual(record["settings"]["blink_ms"], 0)
+
+    def test_an_unknown_variant_or_blink_period_is_rejected(self):
+        with self.assertRaises(ValueError):
+            BlindSpotSettings(variant="bright")
+        with self.assertRaises(ValueError):
+            BlindSpotSettings(variant=blindspot.INVERSE, blink_ms=-5)
+        with self.assertRaises(ValueError):
+            BlindSpotSettings(variant=blindspot.INVERSE, blink_ms=10)
+        with self.assertRaises(ValueError):
+            BlindSpotSettings(variant=blindspot.INVERSE, blink_ms=800)
+
+    def test_both_variants_build_the_same_queue_for_one_seed(self):
+        standard = make_test(
+            BlindSpotSettings(gap=GAP, seed=9, outside_sample=12), side=1920
+        )
+        inverse = make_test(
+            BlindSpotSettings(
+                gap=GAP,
+                seed=9,
+                outside_sample=12,
+                variant=blindspot.INVERSE,
+                blink_ms=blindspot.INVERSE_BLINK_MS,
+            ),
+            side=1920,
+        )
+        self.assertEqual(
+            blindspot.position_keys(standard.queue),
+            blindspot.position_keys(inverse.queue),
+        )
+
+
+class BlinkTest(unittest.TestCase):
+    def setUp(self):
+        self.test = only(
+            make_test(
+                BlindSpotSettings(
+                    gap=GAP,
+                    seed=1,
+                    outside_sample=0,
+                    variant=blindspot.INVERSE,
+                    blink_ms=blindspot.INVERSE_BLINK_MS,
+                )
+            ),
+            (1, 1),
+        )
+        self.test.tick(0)
+        self.onset = self.test.onset_ms
+        self.assertEqual(self.onset, 0)
+
+    def test_the_probe_signal_starts_on_at_onset(self):
+        self.assertTrue(self.test.lit)
+        self.assertTrue(self.test.probe_shown)
+
+    def test_the_probe_alternates_every_half_period(self):
+        self.assertTrue(self.test.tick(self.onset + 500))
+        self.assertFalse(self.test.probe_shown)
+        self.assertFalse(self.test.tick(self.onset + 999))
+        self.assertFalse(self.test.probe_shown)
+        self.assertTrue(self.test.tick(self.onset + 1000))
+        self.assertTrue(self.test.probe_shown)
+        self.assertFalse(self.test.tick(self.onset + 1499))
+        self.assertTrue(self.test.probe_shown)
+
+    def test_no_repaint_is_requested_inside_a_half_period(self):
+        self.assertFalse(self.test.tick(self.onset + 1))
+        self.assertFalse(self.test.tick(self.onset + 499))
+
+    def test_a_response_clears_the_blinking_probe(self):
+        self.assertTrue(self.test.respond(self.onset + 300))
+        self.assertFalse(self.test.probe_shown)
+        self.assertFalse(self.test.lit)
+
+    def test_pause_discards_the_blinking_probe_and_restarts_the_phase(self):
+        self.assertTrue(self.test.pause(self.onset + 100))
+        self.assertFalse(self.test.probe_shown)
+        self.assertTrue(self.test.resume(self.onset + 200))
+        self.assertTrue(self.test.tick(self.test.gap_end_ms))
+        self.assertTrue(self.test.probe_shown)
+
+    def test_the_standard_variant_keeps_the_dot_for_the_whole_window(self):
+        standard = make_test()
+        standard.tick(1000)
+        self.assertTrue(standard.probe_shown)
+        self.assertFalse(standard.tick(1200))
+        self.assertTrue(standard.probe_shown)
+        self.assertFalse(standard.tick(2499))
+        self.assertTrue(standard.probe_shown)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 from . import blindspot, calibration, export
-from .fixation import apply_fixation
+from .fixation import apply_fixation, size_for_dot
 from .geometry import FieldFit, Scale, fit_field
 from .params import Grade, Params, apply_control, lookup
 from .patterns import blindspot as blindspot_patterns
@@ -32,7 +32,7 @@ OVERLAY_BACKGROUND = (16, 16, 16)
 OVERLAY_TEXT_COLOUR = (235, 235, 235)
 
 #: Shown before any pattern is displayed, and repeated in every record.
-STARTUP_NOTICE = f"{export.DISCLAIMER} {export.PHOTOSENSITIVITY_WARNING}"
+STARTUP_NOTICE = f"{export.DISCLAIMER} {export.COMBINED_PHOTOSENSITIVITY_WARNING}"
 
 MONOCULAR_REMINDER = "cover the other eye"
 
@@ -245,10 +245,18 @@ class Session:
                     width,
                     height,
                     test.positions,
-                    lit=test.current if test.lit else None,
+                    lit=test.current if test.probe_shown else None,
                     settings=test.settings,
                 )
-            frame = apply_fixation(frame, params)
+            frame = apply_fixation(
+                frame,
+                params,
+                min_size_px=(
+                    size_for_dot(test.settings.dot_px)
+                    if test.settings.variant == blindspot.INVERSE
+                    else 0
+                ),
+            )
             self.buffer = frame
             self.shown_family = family
             return frame
@@ -286,7 +294,8 @@ class Session:
         """The frame the observer sees: pattern plus optional readout strip."""
         test = self.scotoma
         if test is not None and not test.finished and test.lit:
-            # A lit dot is judged on its own: no strip may cover the stimulus.
+            # An open presentation is judged on its own: no strip may cover the
+            # stimulus, and the inverse variant's dot blinks inside that window.
             return self.render()
         frame = self.render() if self.buffer is None else self.buffer
         if not self.params.overlay:
@@ -357,11 +366,18 @@ class Session:
         ]
 
     def _scotoma_overlay_text(self, test: blindspot.BlindSpotTest) -> str:
+        inverse = self._is_inverse(test)
         parts = [test.progress_text()]
+        if inverse:
+            parts.insert(0, "INVERSE")
         if test.paused:
             parts.append("PAUSED — press p to resume")
         parts.extend(self._scotoma_context())
-        parts.append("photosensitivity: flashing dots")
+        parts.append(
+            "photosensitivity: one blinking dark dot"
+            if inverse
+            else "photosensitivity: flashing dots"
+        )
         parts.append("Space seen | p pause | q results")
         if self.message:
             parts.append(self.message)
@@ -371,6 +387,7 @@ class Session:
         return " | ".join(parts)
 
     def _scotoma_results_text(self, test: blindspot.BlindSpotTest) -> str:
+        inverse = self._is_inverse(test)
         counts = test.counts()
         summary = test.results(self.scale)
         parts = [
@@ -381,9 +398,17 @@ class Session:
         ]
         if not summary["interpretable"]:
             parts.insert(0, "NOT INTERPRETABLE — too few inner-ring dots seen")
+        if inverse:
+            parts.insert(0, "INVERSE — dark dots on bright field")
         parts.extend(self._scotoma_context())
-        parts.append("photosensitivity: flashing dots")
-        parts.append("s export | b restart | q quit")
+        parts.append(
+            "photosensitivity: one blinking dark dot"
+            if inverse
+            else "photosensitivity: flashing dots"
+        )
+        parts.append(
+            f"s export | {self._scotoma_restart_key(test)} restart | q quit"
+        )
         if self.message:
             parts.append(self.message)
         if not self.reliable:
@@ -426,6 +451,9 @@ class Session:
         if action == "blindspot":
             self.start_scotoma_test()
             return ActionResult(True, self.message, "blindspot_started")
+        if action == "blindspot_inverse":
+            self.start_scotoma_test(self.scotoma_settings(blindspot.INVERSE))
+            return ActionResult(True, self.message, "blindspot_started")
         if action == "export":
             return self._handle_export()
         if action == "grade":
@@ -440,6 +468,32 @@ class Session:
         return ActionResult(True, message)
 
     # -- scotoma test -------------------------------------------------------
+    @staticmethod
+    def scotoma_settings(
+        variant: str = blindspot.STANDARD,
+    ) -> blindspot.BlindSpotSettings:
+        """Default settings for one presentation variant (design D1/D7)."""
+        if variant == blindspot.INVERSE:
+            return blindspot.BlindSpotSettings(
+                variant=blindspot.INVERSE, blink_ms=blindspot.INVERSE_BLINK_MS
+            )
+        return blindspot.BlindSpotSettings()
+
+    @staticmethod
+    def _is_inverse(test: blindspot.BlindSpotTest) -> bool:
+        return test.settings.variant == blindspot.INVERSE
+
+    def _scotoma_restart_key(self, test: blindspot.BlindSpotTest) -> str:
+        """The key that starts this variant again from the results frame."""
+        return "i" if self._is_inverse(test) else "b"
+
+    def _scotoma_finished_message(self, test: blindspot.BlindSpotTest) -> str:
+        """What the readout says once a run has a results frame."""
+        return (
+            "scotoma test finished — s exports, "
+            f"{self._scotoma_restart_key(test)} restarts"
+        )
+
     def start_scotoma_test(
         self,
         settings: blindspot.BlindSpotSettings | None = None,
@@ -459,7 +513,11 @@ class Session:
             now_ms=now,
         )
         self.message = (
-            "scotoma test started — Space when a dot appears, p pauses, q finishes"
+            "inverse scotoma test started — Space when a dot blinks, "
+            "p pauses, q finishes"
+            if self._is_inverse(self.scotoma)
+            else "scotoma test started — Space when a dot appears, p pauses, "
+            "q finishes"
         )
         self.hide_key_bar()
         self.render()
@@ -474,7 +532,7 @@ class Session:
         changed = test.tick(now)
         if changed:
             if test.finished:
-                self.message = "scotoma test finished — s exports, b restarts"
+                self.message = self._scotoma_finished_message(test)
             self.render()
         return changed
 
@@ -492,7 +550,11 @@ class Session:
                 )
                 self.render()
             else:
-                self.message = "no dot lit — press Space when a dot appears"
+                self.message = (
+                    "no dot blinking — press Space when a dot blinks"
+                    if self._is_inverse(test)
+                    else "no dot lit — press Space when a dot appears"
+                )
             return ActionResult(scored, self.message, "scotoma_response")
         if key == "p":
             if test.paused:
@@ -505,7 +567,7 @@ class Session:
             return ActionResult(True, self.message, "scotoma_pause")
         if key == "q":
             test.stop(now)
-            self.message = "scotoma test finished — s exports, b restarts"
+            self.message = self._scotoma_finished_message(test)
             self.render()
             return ActionResult(True, self.message, "scotoma_stop")
         if key == "f":

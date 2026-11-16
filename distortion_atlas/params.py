@@ -137,6 +137,7 @@ CONTROLS: tuple[Control, ...] = (
     Control("overlay", ("h",), label="HUD"),
     Control("fixation", ("x",), label="fixation mark"),
     Control("blindspot", ("b",), label="scotoma test"),
+    Control("blindspot_inverse", ("i",), label="scotoma test, inverse variant"),
     Control("export", ("s",), label="export PNG + JSON"),
     Control("fullscreen", ("f",), label="fullscreen"),
     Control("reset", ("r",), label="reset parameters"),
